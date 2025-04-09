@@ -137,21 +137,20 @@ class UserController extends Controller
     public function destroy(User $user)
     {
         // Check if Admin Divisi can delete this user
-        if (auth()->user()->hasRole('Admin Divisi') && $user->department_id !== auth()->user()->department_id) {
-            return redirect()->route('admin.users.index')
-                ->with('error', 'You can only delete users from your department.');
+        if (auth()->user()->hasRole('Admin Divisi')) {
+            if ($user->hasRole('Super Admin')) {
+                return redirect()->route('admin.users.index')
+                    ->with('error', 'You cannot delete Super Admin users.');
+            }
+            if ($user->department_id !== auth()->user()->department_id) {
+                return redirect()->route('admin.users.index')
+                    ->with('error', 'You can only delete users from your department.');
+            }
         }
 
         // Prevent deleting self
         if ($user->id === auth()->id()) {
             return redirect()->back()->with('error', 'You cannot remove your own account.');
-        }
-
-        // Admin Divisi cannot delete Super Admin or another Admin Divisi
-        if (auth()->user()->hasRole('Admin Divisi') && 
-            ($user->hasRole('Super Admin') || $user->hasRole('Admin Divisi'))) {
-            return redirect()->route('admin.users.index')
-                ->with('error', 'You cannot delete admin accounts.');
         }
 
         $user->delete();
@@ -162,9 +161,15 @@ class UserController extends Controller
     public function resetPassword(User $user)
     {
         // Check if Admin Divisi can reset password of this user
-        if (auth()->user()->hasRole('Admin Divisi') && $user->department_id !== auth()->user()->department_id) {
-            return redirect()->route('admin.users.index')
-                ->with('error', 'You can only reset passwords for users from your department.');
+        if (auth()->user()->hasRole('Admin Divisi')) {
+            if ($user->hasRole('Super Admin')) {
+                return redirect()->route('admin.users.index')
+                    ->with('error', 'You cannot reset password for Super Admin users.');
+            }
+            if ($user->department_id !== auth()->user()->department_id) {
+                return redirect()->route('admin.users.index')
+                    ->with('error', 'You can only reset passwords for users from your department.');
+            }
         }
 
         $validated = request()->validate([
@@ -183,9 +188,15 @@ class UserController extends Controller
     public function edit(User $user)
     {
         // Check if Admin Divisi can edit this user
-        if (auth()->user()->hasRole('Admin Divisi') && $user->department_id !== auth()->user()->department_id) {
-            return redirect()->route('admin.users.index')
-                ->with('error', 'You can only edit users from your department.');
+        if (auth()->user()->hasRole('Admin Divisi')) {
+            if ($user->hasRole('Super Admin')) {
+                return redirect()->route('admin.users.index')
+                    ->with('error', 'You cannot edit Super Admin users.');
+            }
+            if ($user->department_id !== auth()->user()->department_id) {
+                return redirect()->route('admin.users.index')
+                    ->with('error', 'You can only edit users from your department.');
+            }
         }
 
         $departments = Department::all();
@@ -199,9 +210,15 @@ class UserController extends Controller
     public function update(Request $request, User $user)
     {
         // Check if Admin Divisi can update this user
-        if (auth()->user()->hasRole('Admin Divisi') && $user->department_id !== auth()->user()->department_id) {
-            return redirect()->route('admin.users.index')
-                ->with('error', 'You can only update users from your department.');
+        if (auth()->user()->hasRole('Admin Divisi')) {
+            if ($user->hasRole('Super Admin')) {
+                return redirect()->route('admin.users.index')
+                    ->with('error', 'You cannot update Super Admin users.');
+            }
+            if ($user->department_id !== auth()->user()->department_id) {
+                return redirect()->route('admin.users.index')
+                    ->with('error', 'You can only update users from your department.');
+            }
         }
 
         $rules = [
@@ -257,14 +274,21 @@ class UserController extends Controller
 
     public function toggleActive(User $user)
     {
+        // Check if Admin Divisi can toggle active status of this user
+        if (auth()->user()->hasRole('Admin Divisi')) {
+            if ($user->hasRole('Super Admin')) {
+                return redirect()->route('admin.users.index')
+                    ->with('error', 'You cannot deactivate Super Admin users.');
+            }
+            if ($user->department_id !== auth()->user()->department_id) {
+                return redirect()->route('admin.users.index')
+                    ->with('error', 'You can only deactivate users from your department.');
+            }
+        }
+
         // Prevent self-deactivation
         if ($user->id === auth()->id()) {
             return redirect()->back()->with('error', 'You cannot deactivate your own account.');
-        }
-
-        // Prevent deactivating last admin
-        if ($user->hasRole('admin') && User::role('admin')->where('is_active', true)->count() <= 1) {
-            return redirect()->back()->with('error', 'Cannot deactivate the last active admin.');
         }
 
         $user->is_active = !$user->is_active;

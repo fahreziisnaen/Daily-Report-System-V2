@@ -58,9 +58,30 @@ class RolePermissionSeeder extends Seeder
             'view-dashboard'
         ]);
 
+        // Create Vice President role (same permissions as Super Admin)
+        $vpRole = Role::create(['name' => 'Vice President']);
+        $vpRole->givePermissionTo([
+            'view-department-users',
+            'manage-users',
+            'view-own-department',
+            'view-department-reports',
+            'manage-department-reports',
+            'view-department-dashboard'
+        ]);
+
         // Create Admin Divisi role
         $adminDivisiRole = Role::create(['name' => 'Admin Divisi']);
         $adminDivisiRole->givePermissionTo([
+            'view-department-users',
+            'view-own-department',
+            'view-department-reports',
+            'manage-department-reports',
+            'view-department-dashboard'
+        ]);
+
+        // Create Verifikator role (same permissions as Admin Divisi)
+        $verifikatorRole = Role::create(['name' => 'Verifikator']);
+        $verifikatorRole->givePermissionTo([
             'view-department-users',
             'view-own-department',
             'view-department-reports',

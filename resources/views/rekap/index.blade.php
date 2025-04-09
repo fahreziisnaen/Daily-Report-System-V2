@@ -67,14 +67,18 @@
                                         <td class="px-6 py-4 whitespace-nowrap text-sm">{{ \App\Helpers\TimeHelper::formatHoursToHoursMinutes($user['total_overtime_hours']) }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm">{{ $user['report_count'] }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-right text-sm">
-                                            <a href="{{ route('admin.rekap.export', ['user' => $user['id'], 'month' => $month, 'year' => $year]) }}" 
-                                                class="inline-flex items-center px-3 py-1.5 bg-green-50 text-green-600 rounded-md hover:bg-green-100">
-                                                <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-                                                </svg>
-                                                Export Excel
-                                            </a>
+                                            @if($user['report_count'] > 0)
+                                                <a href="{{ route('admin.rekap.export', ['user' => $user['id'], 'month' => $month, 'year' => $year]) }}" 
+                                                    class="inline-flex items-center px-3 py-1.5 bg-green-50 text-green-600 rounded-md hover:bg-green-100">
+                                                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                                                    </svg>
+                                                    Export Excel
+                                                </a>
+                                            @else
+                                                <span class="text-gray-400 text-xs">Tidak ada laporan</span>
+                                            @endif
                                         </td>
                                     </tr>
                                 @endforeach
@@ -106,14 +110,18 @@
                             </div>
                         </div>
                         <div class="mt-4 flex justify-end">
-                            <a href="{{ route('admin.rekap.export', ['user' => $user['id'], 'month' => $month, 'year' => $year]) }}" 
-                                class="inline-flex items-center px-3 py-1.5 bg-green-50 text-green-600 rounded-md hover:bg-green-100">
-                                <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-                                </svg>
-                                Export Excel
-                            </a>
+                            @if($user['report_count'] > 0)
+                                <a href="{{ route('admin.rekap.export', ['user' => $user['id'], 'month' => $month, 'year' => $year]) }}" 
+                                    class="inline-flex items-center px-3 py-1.5 bg-green-50 text-green-600 rounded-md hover:bg-green-100">
+                                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                                    </svg>
+                                    Export Excel
+                                </a>
+                            @else
+                                <span class="text-gray-400 text-xs">Tidak ada laporan</span>
+                            @endif
                         </div>
                     </div>
                 @endforeach

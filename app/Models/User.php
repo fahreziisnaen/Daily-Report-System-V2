@@ -9,6 +9,7 @@ use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\Report;
 
 class User extends Authenticatable
 {
@@ -68,7 +69,17 @@ class User extends Authenticatable
 
     public function isAdmin()
     {
-        return $this->hasRole('Super Admin');
+        return $this->hasRole(['Super Admin', 'Admin Divisi', 'Vice President']);
+    }
+
+    public function canModifyReport(Report $report)
+    {
+        if ($this->hasRole('Super Admin')) {
+            return true;
+        }
+        
+        // Admin Divisi or regular users can only modify their own reports
+        return $report->user_id === $this->id;
     }
 
     public function getAvatarUrlAttribute()

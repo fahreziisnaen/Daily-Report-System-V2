@@ -14,16 +14,16 @@
                     Manage Department
                 </a>
                 @endrole
-                <button 
-                    type="button"
-                    x-data=""
-                    @click="$dispatch('open-modal', 'add-user')" 
-                    class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
-                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                    </svg>
-                    Add User
-                </button>
+            <button 
+                type="button"
+                x-data=""
+                @click="$dispatch('open-modal', 'add-user')" 
+                class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                Add User
+            </button>
             </div>
         </div>
     </x-slot>
@@ -78,7 +78,7 @@
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                         <tr>
-                            <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name/Email</th>
+                            <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nama Pekerja</th>
                             <th class="hidden md:table-cell px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Position</th>
                             <th class="hidden md:table-cell px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
                             <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
@@ -106,7 +106,7 @@
                                         if (this.newRole !== this.oldRole) {
                                             if (confirm('Are you sure you want to change the role?')) {
                                                 $refs.roleForm.submit();
-                                            } else {
+                                        } else {
                                                 this.newRole = this.oldRole;
                                             }
                                         }
@@ -152,29 +152,30 @@
                             <td class="px-3 py-2 text-right">
                                 <div class="flex items-center justify-end gap-3">
                                     <!-- Edit User -->
+                                    @if(!auth()->user()->hasRole('Admin Divisi') || !$user->hasRole('Super Admin'))
                                     <a href="{{ route('admin.users.edit', $user) }}" 
-                                        class="text-blue-600 hover:text-blue-900" 
+                                        class="text-blue-600 hover:text-blue-900"
                                         title="Edit User">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                                         </svg>
                                     </a>
-                                    
+
                                     <!-- Reset Password -->
-                                    <button type="button" 
+                                    <button type="button"
                                         @click="$dispatch('open-modal', 'reset-password-{{ $user->id }}')" 
-                                        class="text-yellow-600 hover:text-yellow-900" 
+                                        class="text-yellow-600 hover:text-yellow-900"
                                         title="Reset Password">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
                                         </svg>
                                     </button>
-                                    
+
                                     <!-- Activate/Deactivate User -->
                                     @if($user->is_active)
                                         <button type="button" 
                                             @click="$dispatch('open-modal', 'deactivate-user-{{ $user->id }}')" 
-                                            class="text-orange-600 hover:text-orange-900" 
+                                            class="text-orange-600 hover:text-orange-900"
                                             title="Deactivate User">
                                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path>
@@ -197,12 +198,35 @@
                                     <!-- Delete User -->
                                     <button type="button"
                                         @click="$dispatch('open-modal', 'delete-user-{{ $user->id }}')"
-                                        class="text-red-600 hover:text-red-900"
-                                        title="Delete User">
+                                            class="text-red-600 hover:text-red-900"
+                                            title="Delete User">
+                                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                                            </svg>
+                                        </button>
+                                    @else
+                                    <!-- Show disabled buttons for Super Admin users when viewed by Admin Divisi -->
+                                    <span class="text-gray-400 cursor-not-allowed" title="You cannot edit Super Admin users">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                        </svg>
+                                    </span>
+                                    <span class="text-gray-400 cursor-not-allowed" title="You cannot reset password for Super Admin users">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
+                                        </svg>
+                                    </span>
+                                    <span class="text-gray-400 cursor-not-allowed" title="You cannot deactivate Super Admin users">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path>
+                                        </svg>
+                                    </span>
+                                    <span class="text-gray-400 cursor-not-allowed" title="You cannot delete Super Admin users">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                                         </svg>
-                                    </button>
+                                    </span>
+                                    @endif
                                 </div>
                             </td>
                         </tr>
@@ -302,7 +326,7 @@
                 <x-input-label for="password" :value="__('Password')" />
                 <x-text-input id="password" name="password" type="password" class="mt-1 block w-full" required />
                 <x-input-error class="mt-2" :messages="$errors->get('password')" />
-            </div>
+                    </div>
 
             <div class="mt-4">
                 <x-input-label for="password_confirmation" :value="__('Confirm Password')" />
@@ -324,43 +348,44 @@
 
     <!-- Delete User Modal -->
     @foreach($users as $user)
+        @if(!auth()->user()->hasRole('Admin Divisi') || !$user->hasRole('Super Admin'))
         <x-modal name="delete-user-{{ $user->id }}" :show="false">
             <form method="POST" action="{{ route('admin.users.destroy', $user) }}" class="p-6">
-                @csrf
+            @csrf
                 @method('DELETE')
-                <h2 class="text-lg font-medium text-gray-900">
+            <h2 class="text-lg font-medium text-gray-900">
                     {{ __('Delete User') }}
-                </h2>
+            </h2>
 
                 <p class="mt-4 text-sm text-gray-600">
                     {{ __('Are you sure you want to delete this user? This action cannot be undone.') }}
-                </p>
+            </p>
 
-                <div class="mt-6 flex justify-end">
-                    <x-secondary-button x-on:click="$dispatch('close')">
+            <div class="mt-6 flex justify-end">
+                <x-secondary-button x-on:click="$dispatch('close')">
                         {{ __('Cancel') }}
-                    </x-secondary-button>
+                </x-secondary-button>
 
                     <x-danger-button class="ml-3">
                         {{ __('Delete') }}
                     </x-danger-button>
-                </div>
-            </form>
-        </x-modal>
+            </div>
+        </form>
+    </x-modal>
 
         <!-- Reset Password Modal -->
         <x-modal name="reset-password-{{ $user->id }}" :show="false">
             <form method="POST" action="{{ route('admin.users.reset-password', $user) }}" class="p-6">
-                @csrf
-                <h2 class="text-lg font-medium text-gray-900">
+            @csrf
+            <h2 class="text-lg font-medium text-gray-900">
                     {{ __('Reset Password') }}
-                </h2>
+            </h2>
 
                 <div class="mt-4">
                     <x-input-label for="new_password" :value="__('New Password')" />
                     <x-text-input id="new_password" name="new_password" type="password" class="mt-1 block w-full" required />
                     <x-input-error class="mt-2" :messages="$errors->get('new_password')" />
-                </div>
+            </div>
 
                 <div class="mt-4">
                     <x-input-label for="new_password_confirmation" :value="__('Confirm New Password')" />
@@ -368,44 +393,45 @@
                     <x-input-error class="mt-2" :messages="$errors->get('new_password_confirmation')" />
                 </div>
 
-                <div class="mt-6 flex justify-end">
-                    <x-secondary-button x-on:click="$dispatch('close')">
+            <div class="mt-6 flex justify-end">
+                <x-secondary-button x-on:click="$dispatch('close')">
                         {{ __('Cancel') }}
-                    </x-secondary-button>
+                </x-secondary-button>
 
-                    <x-primary-button class="ml-3">
+                <x-primary-button class="ml-3">
                         {{ __('Reset Password') }}
-                    </x-primary-button>
-                </div>
-            </form>
-        </x-modal>
-        
+                </x-primary-button>
+            </div>
+        </form>
+    </x-modal>
+
         <!-- Deactivate User Modal -->
         @if($user->is_active)
         <x-modal name="deactivate-user-{{ $user->id }}" :show="false">
             <form method="POST" action="{{ route('admin.users.toggle-active', $user) }}" class="p-6">
-                @csrf
+            @csrf
                 @method('PUT')
-                <h2 class="text-lg font-medium text-gray-900">
+            <h2 class="text-lg font-medium text-gray-900">
                     {{ __('Deactivate User') }}
-                </h2>
+            </h2>
 
                 <div class="mt-4">
                     <x-input-label for="reason" :value="__('Reason for Deactivation (Optional)')" />
                     <textarea id="reason" name="reason" class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm" rows="3"></textarea>
-                </div>
+            </div>
 
-                <div class="mt-6 flex justify-end">
-                    <x-secondary-button x-on:click="$dispatch('close')">
+            <div class="mt-6 flex justify-end">
+                <x-secondary-button x-on:click="$dispatch('close')">
                         {{ __('Cancel') }}
-                    </x-secondary-button>
+                </x-secondary-button>
 
                     <x-danger-button class="ml-3">
                         {{ __('Deactivate') }}
                     </x-danger-button>
-                </div>
-            </form>
-        </x-modal>
+            </div>
+        </form>
+    </x-modal>
+        @endif
         @endif
     @endforeach
 </x-app-layout>

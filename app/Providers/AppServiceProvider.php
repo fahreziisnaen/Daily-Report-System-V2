@@ -26,8 +26,8 @@ class AppServiceProvider extends ServiceProvider
         // Set Carbon locale
         Carbon::setLocale('id');
 
-        // Use Bootstrap 5 pagination
-        Paginator::useBootstrapFive();
+        // Use Tailwind CSS pagination instead of Bootstrap
+        Paginator::useTailwind();
 
         // Setup view composers
         View::composer(['layouts.navigation', 'layouts.app'], function ($view) {

@@ -6,6 +6,8 @@ use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvid
 use Illuminate\Support\Facades\Gate;
 use App\Models\Report;
 use App\Policies\ReportPolicy;
+use App\Models\User;
+use App\Policies\UserPolicy;
 
 class AuthServiceProvider extends ServiceProvider
 {
@@ -16,6 +18,7 @@ class AuthServiceProvider extends ServiceProvider
      */
     protected $policies = [
         Report::class => ReportPolicy::class,
+        User::class => UserPolicy::class,
     ];
 
     /**
@@ -27,7 +30,7 @@ class AuthServiceProvider extends ServiceProvider
 
         // Define admin gate
         Gate::define('admin', function ($user) {
-            return $user->hasRole('Super Admin') || $user->hasRole('Admin Divisi');
+            return $user->hasRole('Super Admin') || $user->hasRole('Admin Divisi') || $user->hasRole('Vice President') || $user->hasRole('Verifikator');
         });
 
         // Implicitly grant "Super Admin" role all permissions

@@ -20,14 +20,18 @@
                         {{ __('Reports') }}
                     </x-nav-link>
 
-                    @role(['Super Admin', 'Admin Divisi'])
+                    @role(['Super Admin', 'Admin Divisi', 'Vice President', 'Verifikator'])
                     <x-nav-link :href="route('admin.users.index')" :active="request()->routeIs('admin.users.*')">
                         {{ __('User Management') }}
                     </x-nav-link>
                     @endrole
 
-                    @role(['Super Admin', 'Admin Divisi'])
+                    @role(['Super Admin', 'Admin Divisi', 'Vice President', 'Verifikator'])
                     <x-nav-link :href="route('admin.rekap.index')" :active="request()->routeIs('admin.rekap.*')">
+                        {{ __('Rekap') }}
+                    </x-nav-link>
+                    @else
+                    <x-nav-link :href="route('rekap.index')" :active="request()->routeIs('rekap.index')">
                         {{ __('Rekap') }}
                     </x-nav-link>
                     @endrole
@@ -121,12 +125,16 @@
                 {{ __('Reports') }}
             </x-responsive-nav-link>
 
-            @role(['Super Admin', 'Admin Divisi'])
+            @role(['Super Admin', 'Admin Divisi', 'Vice President', 'Verifikator'])
             <x-responsive-nav-link :href="route('admin.users.index')" :active="request()->routeIs('admin.users.*')">
                 {{ __('User Management') }}
             </x-responsive-nav-link>
 
             <x-responsive-nav-link :href="route('admin.rekap.index')" :active="request()->routeIs('admin.rekap.*')">
+                {{ __('Rekap') }}
+            </x-responsive-nav-link>
+            @else
+            <x-responsive-nav-link :href="route('rekap.index')" :active="request()->routeIs('rekap.index')">
                 {{ __('Rekap') }}
             </x-responsive-nav-link>
             @endrole

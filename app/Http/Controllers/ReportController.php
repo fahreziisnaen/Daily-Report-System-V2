@@ -2,13 +2,22 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\ReportCreated;
+use App\Events\ReportUpdated;
+use App\Models\Project;
 use App\Models\Report;
+use App\Models\ReportDetail;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use PhpOffice\PhpSpreadsheet\Style\Alignment;
+use PhpOffice\PhpSpreadsheet\Style\Border;
+use PhpOffice\PhpSpreadsheet\Style\Fill;
 
 class ReportController extends Controller
 {
@@ -16,54 +25,61 @@ class ReportController extends Controller
 
     public function index(Request $request)
     {
-        $query = Report::with(['user', 'details']);
+        $query = Report::with('user', 'details')->orderBy('report_date', 'desc');
         
-        // Debug user role
-        \Log::info('User Role Check', [
-            'user_id' => auth()->id(),
-            'is_admin' => auth()->user()->hasRole('Super Admin'),
-            'roles' => auth()->user()->getRoleNames()
-        ]);
-
-        // Filter berdasarkan user_id kecuali untuk admin
-        if (!auth()->user()->hasRole('Super Admin')) {
+        // Filter by user if admin and employee search is provided
+        if (auth()->user()->isAdmin() && $request->filled('employee_search')) {
+            $query->whereHas('user', function ($q) use ($request) {
+                $q->where('name', 'like', $request->employee_search);
+            });
+        } 
+        // For non-admin users, only show their own reports
+        elseif (!auth()->user()->isAdmin()) {
             $query->where('user_id', auth()->id());
         }
-
-        // Filter lainnya
-        $query->when($request->filled('employee_search'), function ($query) use ($request) {
-            return $query->whereHas('user', function($q) use ($request) {
-                $q->where('name', $request->employee_search);
-            });
-        })
-        ->when($request->filled('report_date'), function ($query) use ($request) {
-            return $query->whereDate('report_date', $request->report_date);
-        })
-        ->when($request->filled('location'), function ($query) use ($request) {
-            return $query->where('location', $request->location);
-        })
-        ->when($request->filled('project_code'), function ($query) use ($request) {
-            return $query->where('project_code', $request->project_code);
-        })
-        ->latest('report_date');
-
-        // Debug query
-        \Log::info('Report Query', [
-            'user_id' => auth()->id(),
-            'is_filtered' => !auth()->user()->hasRole('Super Admin'),
-            'sql' => $query->toSql(),
-            'bindings' => $query->getBindings()
-        ]);
-
-        // Get data for dropdowns
-        $locations = Report::distinct()->pluck('location');
-        $projectCodes = Report::distinct()->pluck('project_code');
-        $employees = User::pluck('name');
-        $workDayTypes = ['Hari Kerja', 'Hari Libur'];
-
+        
+        // Filter by date if provided
+        if ($request->filled('report_date')) {
+            $query->whereDate('report_date', $request->report_date);
+        }
+        
+        // Filter by location if provided
+        if ($request->filled('location')) {
+            $query->where('location', $request->location);
+        }
+        
+        // Filter by project code if provided
+        if ($request->filled('project_code')) {
+            $query->where('project_code', $request->project_code);
+        }
+        
         $reports = $query->paginate(10)->withQueryString();
-
-        return view('reports.index', compact('reports', 'locations', 'projectCodes', 'workDayTypes', 'employees'));
+        
+        // Get unique employee names for filter dropdown (for admins)
+        $employees = '[]';
+        if (auth()->user()->isAdmin()) {
+            $employees = User::orderBy('name')
+                ->pluck('name')
+                ->toJson();
+        }
+        
+        // Get unique locations for filter dropdown
+        $locations = Report::distinct()
+            ->orderBy('location')
+            ->pluck('location')
+            ->filter()
+            ->values()
+            ->toJson();
+            
+        // Get unique project codes for filter dropdown
+        $projectCodes = Report::distinct()
+            ->orderBy('project_code')
+            ->pluck('project_code')
+            ->filter()
+            ->values()
+            ->toJson();
+            
+        return view('reports.index', compact('reports', 'employees', 'locations', 'projectCodes'));
     }
 
     public function create()
@@ -245,16 +261,26 @@ class ReportController extends Controller
 
     public function export(Report $report)
     {
-        $this->authorize('view', $report);
+        $this->authorize('export', $report);
+
+        // Check if user is authorized to export this report
+        if (auth()->user()->hasRole('Super Admin')) {
+            // Super Admin can export any report
+        } elseif (auth()->user()->hasRole('Admin Divisi') || auth()->user()->hasRole('Verifikator')) {
+            // Admin Divisi and Verifikator can export reports from their department
+            if ($report->user->department_id != auth()->user()->department_id) {
+                abort(403, 'Unauthorized action.');
+            }
+        } else {
+            // Regular employee can only export their own reports
+            if ($report->user_id != auth()->id()) {
+                abort(403, 'Unauthorized action.');
+            }
+        }
 
         try {
-            // Load template
-            $templatePath = storage_path('app/templates/exportlembur.xlsx');
-            if (!file_exists($templatePath)) {
-                throw new \Exception('Template file not found');
-            }
-
-            $spreadsheet = IOFactory::load($templatePath);
+            // Prepare the Excel file
+            $spreadsheet = new Spreadsheet();
             $sheet = $spreadsheet->getActiveSheet();
             
             // Format tanggal dan data umum

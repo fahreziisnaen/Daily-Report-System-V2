@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\Report;
 use App\Models\User;
+use App\Models\Department;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use Illuminate\Support\Facades\Auth;
 
 class RekapController extends Controller
 {
@@ -61,68 +63,42 @@ class RekapController extends Controller
 
     public function index(Request $request)
     {
-        $month = $request->get('month', date('n'));
-        $year = $request->get('year', date('Y'));
-
-        // Get users based on role
+        $month = $request->get('month', now()->month);
+        $year = $request->get('year', now()->year);
+        $user = Auth::user();
         $usersQuery = User::query();
-        
-        // Filter user by department for Admin Divisi
-        if (auth()->user()->hasRole('Admin Divisi')) {
-            $adminDepartmentId = auth()->user()->department_id;
-            $usersQuery->where('department_id', $adminDepartmentId);
-        }
-        
-        // Get all users
-        $users = $usersQuery->get()->map(function($user) use ($month, $year) {
-            \Log::info("Processing user {$user->name}", [
-                'user_id' => $user->id,
-                'month' => $month,
-                'year' => $year
-            ]);
 
-            $reports = $user->reports()
-                ->whereMonth('report_date', $month)
-                ->whereYear('report_date', $year)
-                ->get();
-
-            \Log::info("Found reports for {$user->name}", [
-                'report_count' => $reports->count(),
-                'reports' => $reports->pluck('report_date', 'id')
-            ]);
-
-            $totalWorkHours = 0;
-            $totalOvertimeHours = 0;
-            $reportCount = $reports->count();
-
-            foreach($reports as $report) {
-                $hours = $this->calculateHours($report);
-                $totalWorkHours += $hours['workHours'];
-                $totalOvertimeHours += $hours['overtimeHours'];
-            }
-
-            return [
-                'id' => $user->id,
-                'name' => $user->name,
-                'total_work_hours' => round($totalWorkHours, 2),
-                'total_overtime_hours' => round($totalOvertimeHours, 2),
-                'report_count' => $reportCount
-            ];
-        });
-
-        // Filter hanya user yang memiliki laporan
-        $users = $users->filter(function($user) {
-            return $user['report_count'] > 0;
-        })->values();
-
-        $months = [];
-        for($i = 1; $i <= 12; $i++) {
-            $months[$i] = Carbon::create(null, $i, 1)->format('F');
+        // Filter users based on role
+        if ($user->hasRole(['Admin Divisi', 'Verifikator', 'Vice President'])) {
+            $usersQuery->where('department_id', $user->department_id);
+        } elseif (!$user->hasRole('Super Admin')) {
+            $usersQuery->where('id', $user->id);
         }
 
+        // Filters
+        if ($request->has('department') && $request->department) {
+            $usersQuery->where('department_id', $request->department);
+        }
+
+        // Get users and process their data
+        $rawUsers = $usersQuery->get();
+        $users = collect();
+        
+        foreach ($rawUsers as $user) {
+            $userData = $this->processUserData($user, $month, $year);
+            $users->push($userData);
+        }
+
+        // Get departments for filter
+        $departments = Department::orderBy('name')->get();
+        
+        // Get months for dropdown
+        $months = $this->getMonths();
+        
+        // Get years for dropdown (current year and previous year)
         $years = range(date('Y') - 1, date('Y') + 1);
 
-        return view('rekap.index', compact('users', 'months', 'month', 'years', 'year'));
+        return view('rekap.index', compact('users', 'departments', 'months', 'years', 'month', 'year'));
     }
 
     private function getMonths()
@@ -145,13 +121,35 @@ class RekapController extends Controller
 
     public function export(Request $request, User $user)
     {
+        $authUser = auth()->user();
+        
+        // Only Super Admin, Vice President, and Admin Divisi can export
+        if (!$authUser->hasRole(['Super Admin', 'Vice President', 'Admin Divisi'])) {
+            return redirect()->route('rekap.index')
+                ->with('error', 'Anda tidak memiliki izin untuk mengekspor rekap.');
+        }
+        
+        // Vice President and Admin Divisi can only export users from their department
+        if (($authUser->hasRole('Vice President') || $authUser->hasRole('Admin Divisi')) && 
+            $user->department_id !== $authUser->department_id) {
+            return redirect()->route('admin.rekap.index')
+                ->with('error', 'Anda hanya dapat mengekspor rekap untuk pengguna di departemen Anda.');
+        }
+
         $month = $request->get('month', now()->month);
         $year = $request->get('year', now()->year);
 
-        // Restrict access for Admin Divisi to only users in their department
-        if (auth()->user()->hasRole('Admin Divisi') && $user->department_id !== auth()->user()->department_id) {
+        // Get reports for the specified month and year
+        $reports = $user->reports()
+            ->whereMonth('report_date', $month)
+            ->whereYear('report_date', $year)
+            ->orderBy('report_date')
+            ->get();
+
+        // If no reports, redirect back with a message
+        if ($reports->count() === 0) {
             return redirect()->route('admin.rekap.index')
-                ->with('error', 'You can only export reports for users in your department.');
+                ->with('error', 'Tidak ada laporan untuk diexport pada periode yang dipilih.');
         }
 
         try {
@@ -169,13 +167,8 @@ class RekapController extends Controller
 
             $row = 5; // Mulai dari baris 5
 
-            // Ambil semua laporan (tidak perlu filter is_overtime lagi)
-            foreach ($user->reports()
-                ->whereMonth('report_date', $month)
-                ->whereYear('report_date', $year)
-                ->orderBy('report_date')
-                ->get() as $report) {
-
+            // Ambil semua laporan
+            foreach ($reports as $report) {
                 // Isi data ke excel
                 $sheet->setCellValue("A{$row}", $report->report_date->format('d-m-Y'));
                 $sheet->setCellValue("B{$row}", $report->project_code);
@@ -232,5 +225,144 @@ class RekapController extends Controller
         } catch (\Exception $e) {
             return redirect()->back()->with('error', 'Gagal mengexport file: ' . $e->getMessage());
         }
+    }
+
+    public function employeeRekap(Request $request)
+    {
+        $month = $request->get('month', date('n'));
+        $year = $request->get('year', date('Y'));
+        $user = auth()->user();
+
+        // Get only the current user's data
+        $userData = $this->processUserData($user, $month, $year);
+
+        $months = [];
+        for($i = 1; $i <= 12; $i++) {
+            $months[$i] = Carbon::create(null, $i, 1)->format('F');
+        }
+
+        $years = range(date('Y') - 1, date('Y') + 1);
+
+        return view('rekap.employee', compact('userData', 'months', 'month', 'years', 'year'));
+    }
+
+    public function employeeExport(Request $request)
+    {
+        $month = $request->get('month', now()->month);
+        $year = $request->get('year', now()->year);
+        $user = auth()->user();
+
+        // Get reports for the specified month and year
+        $reports = $user->reports()
+            ->whereMonth('report_date', $month)
+            ->whereYear('report_date', $year)
+            ->orderBy('report_date')
+            ->get();
+
+        // If no reports, redirect back with a message
+        if ($reports->count() === 0) {
+            return redirect()->route('rekap.index')
+                ->with('error', 'Tidak ada laporan untuk diexport pada periode yang dipilih.');
+        }
+
+        try {
+            $templatePath = storage_path('app/templates/exportlaporan.xlsx');
+            if (!file_exists($templatePath)) {
+                throw new \Exception('Template file tidak ditemukan di: ' . $templatePath);
+            }
+
+            $spreadsheet = IOFactory::load($templatePath);
+            $sheet = $spreadsheet->getActiveSheet();
+
+            // Set informasi user dan periode
+            $sheet->setCellValue('B1', $user->name);
+            $sheet->setCellValue('B2', Carbon::create($year, $month)->locale('id')->isoFormat('MMMM Y'));
+
+            $row = 5; // Mulai dari baris 5
+
+            // Ambil semua laporan
+            foreach ($reports as $report) {
+                // Isi data ke excel
+                $sheet->setCellValue("A{$row}", $report->report_date->format('d-m-Y'));
+                $sheet->setCellValue("B{$row}", $report->project_code);
+                $sheet->setCellValue("C{$row}", Carbon::parse($report->start_time)->format('H:i'));
+                $sheet->setCellValue("D{$row}", Carbon::parse($report->end_time)->format('H:i'));
+                $sheet->setCellValue("E{$row}", $report->location);
+                
+                // Uraian pekerjaan dari detail laporan
+                $details = [];
+                foreach ($report->details as $detail) {
+                    $details[] = $detail->description;
+                }
+                $sheet->setCellValue("F{$row}", implode("\n", $details));
+                
+                // Status pekerjaan
+                $statuses = [];
+                foreach ($report->details as $detail) {
+                    $statuses[] = $detail->status;
+                }
+                $sheet->setCellValue("G{$row}", implode("\n", $statuses));
+
+                // Set style untuk baris
+                $sheet->getStyle("A{$row}:G{$row}")->applyFromArray([
+                    'borders' => [
+                        'allBorders' => [
+                            'borderStyle' => \PhpOffice\PhpSpreadsheet\Style\Border::BORDER_THIN
+                        ]
+                    ]
+                ]);
+
+                // Wrap text untuk kolom deskripsi dan status
+                $sheet->getStyle("F{$row}:G{$row}")->getAlignment()->setWrapText(true);
+
+                $row++;
+            }
+
+            // Auto-size columns
+            foreach (range('A', 'G') as $col) {
+                $sheet->getColumnDimension($col)->setAutoSize(true);
+            }
+
+            // Format nama bulan
+            $monthName = Carbon::create($year, $month)->locale('id')->isoFormat('MMMM');
+
+            header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            header('Content-Disposition: attachment;filename="Summary Pekerjaan ' . $user->name . ' - ' . $monthName . ' ' . $year . '.xlsx"');
+            header('Cache-Control: max-age=0');
+
+            $writer = IOFactory::createWriter($spreadsheet, 'Xlsx');
+            ob_end_clean();
+            $writer->save('php://output');
+            exit;
+
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'Gagal mengexport file: ' . $e->getMessage());
+        }
+    }
+
+    private function processUserData(User $user, $month, $year)
+    {
+        $reports = $user->reports()
+            ->whereMonth('report_date', $month)
+            ->whereYear('report_date', $year)
+            ->get();
+
+        $totalWorkHours = 0;
+        $totalOvertimeHours = 0;
+        $reportCount = $reports->count();
+
+        foreach($reports as $report) {
+            $hours = $this->calculateHours($report);
+            $totalWorkHours += $hours['workHours'];
+            $totalOvertimeHours += $hours['overtimeHours'];
+        }
+
+        return [
+            'id' => $user->id,
+            'name' => $user->name,
+            'total_work_hours' => round($totalWorkHours, 2),
+            'total_overtime_hours' => round($totalOvertimeHours, 2),
+            'report_count' => $reportCount
+        ];
     }
 } 

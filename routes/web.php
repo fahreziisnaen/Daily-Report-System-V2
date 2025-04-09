@@ -56,7 +56,14 @@ Route::middleware('auth')->group(function () {
     Route::get('/reports/{report}/edit', [ReportController::class, 'edit'])->name('reports.edit');
     Route::put('/reports/{report}', [ReportController::class, 'update'])->name('reports.update');
     Route::delete('/reports/{report}', [ReportController::class, 'destroy'])->name('reports.destroy');
-    Route::get('/reports/{report}/export', [ReportController::class, 'export'])->name('reports.export');
+    Route::get('/reports/export/{report}', [ReportController::class, 'export'])->name('reports.export');
+    
+    // Reports resource routes
+    Route::resource('reports', ReportController::class);
+
+    // Employee rekap routes
+    Route::get('/rekap', [RekapController::class, 'employeeRekap'])->name('rekap.index');
+    Route::get('/rekap/export', [RekapController::class, 'employeeExport'])->name('rekap.export');
 
     // API routes for search
     Route::middleware('auth')->group(function () {
