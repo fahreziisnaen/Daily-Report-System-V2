@@ -26,16 +26,29 @@ class ReportController extends Controller
     public function index(Request $request)
     {
         $query = Report::with('user', 'details')->orderBy('report_date', 'desc');
+        $authUser = auth()->user();
         
-        // Filter by user if admin and employee search is provided
-        if (auth()->user()->isAdmin() && $request->filled('employee_search')) {
-            $query->whereHas('user', function ($q) use ($request) {
-                $q->where('name', 'like', $request->employee_search);
-            });
+        // Filter reports based on user role
+        if ($authUser->hasRole('Super Admin')) {
+            // Super Admin sees all reports
+            // No additional filtering needed
         } 
-        // For non-admin users, only show their own reports
-        elseif (!auth()->user()->isAdmin()) {
-            $query->where('user_id', auth()->id());
+        elseif ($authUser->hasRole('Vice President') || $authUser->hasRole('Admin Divisi') || $authUser->hasRole('Verifikator')) {
+            // Vice President, Admin Divisi, and Verifikator only see reports from their department
+            $query->whereHas('user', function ($q) use ($authUser) {
+                $q->where('department_id', $authUser->department_id);
+            });
+            
+            // Additional employee search if provided
+            if ($request->filled('employee_search')) {
+                $query->whereHas('user', function ($q) use ($request) {
+                    $q->where('name', 'like', '%' . $request->employee_search . '%');
+                });
+            }
+        } 
+        else {
+            // Regular employees only see their own reports
+            $query->where('user_id', $authUser->id);
         }
         
         // Filter by date if provided
@@ -52,33 +65,50 @@ class ReportController extends Controller
         if ($request->filled('project_code')) {
             $query->where('project_code', $request->project_code);
         }
-        
+
         $reports = $query->paginate(10)->withQueryString();
-        
+
         // Get unique employee names for filter dropdown (for admins)
         $employees = '[]';
-        if (auth()->user()->isAdmin()) {
-            $employees = User::orderBy('name')
-                ->pluck('name')
-                ->toJson();
+        if ($authUser->isAdmin()) {
+            // For Vice President, Admin Divisi, and Verifikator, only show employees from their department
+            $employeesQuery = User::orderBy('name');
+            
+            if ($authUser->hasRole(['Vice President', 'Admin Divisi', 'Verifikator'])) {
+                $employeesQuery->where('department_id', $authUser->department_id);
+            }
+            
+            $employees = $employeesQuery->pluck('name')->toJson();
         }
         
         // Get unique locations for filter dropdown
-        $locations = Report::distinct()
-            ->orderBy('location')
-            ->pluck('location')
-            ->filter()
-            ->values()
-            ->toJson();
-            
+        $locationsQuery = Report::distinct()->orderBy('location');
+        
+        // Restrict locations based on role
+        if ($authUser->hasRole(['Vice President', 'Admin Divisi', 'Verifikator'])) {
+            $locationsQuery->whereHas('user', function ($q) use ($authUser) {
+                $q->where('department_id', $authUser->department_id);
+            });
+        } elseif (!$authUser->hasRole('Super Admin')) {
+            $locationsQuery->where('user_id', $authUser->id);
+        }
+        
+        $locations = $locationsQuery->pluck('location')->filter()->values()->toJson();
+        
         // Get unique project codes for filter dropdown
-        $projectCodes = Report::distinct()
-            ->orderBy('project_code')
-            ->pluck('project_code')
-            ->filter()
-            ->values()
-            ->toJson();
-            
+        $projectCodesQuery = Report::distinct()->orderBy('project_code');
+        
+        // Restrict project codes based on role
+        if ($authUser->hasRole(['Vice President', 'Admin Divisi', 'Verifikator'])) {
+            $projectCodesQuery->whereHas('user', function ($q) use ($authUser) {
+                $q->where('department_id', $authUser->department_id);
+            });
+        } elseif (!$authUser->hasRole('Super Admin')) {
+            $projectCodesQuery->where('user_id', $authUser->id);
+        }
+        
+        $projectCodes = $projectCodesQuery->pluck('project_code')->filter()->values()->toJson();
+        
         return view('reports.index', compact('reports', 'employees', 'locations', 'projectCodes'));
     }
 

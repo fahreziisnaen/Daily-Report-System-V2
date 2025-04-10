@@ -18,11 +18,11 @@ class DashboardController extends Controller
         $recentReportsQuery = Report::with(['user', 'details'])
             ->latest('report_date');
 
-        if ($user->hasRole(['Super Admin', 'Vice President'])) {
-            // Super Admin and Vice President see all reports
+        if ($user->hasRole('Super Admin')) {
+            // Super Admin sees all reports
             $recentReports = $recentReportsQuery->take(5)->get();
-        } elseif ($user->hasRole(['Admin Divisi', 'Verifikator'])) {
-            // Admin Divisi and Verifikator see reports from their department
+        } elseif ($user->hasRole(['Vice President', 'Admin Divisi', 'Verifikator', 'Human Resource'])) {
+            // Vice President, Admin Divisi, Verifikator and Human Resource see reports from their department
             $recentReports = $recentReportsQuery
                 ->whereHas('user', function($query) use ($user) {
                     $query->where('department_id', $user->department_id);
@@ -40,8 +40,8 @@ class DashboardController extends Controller
         // Get summaries for calendar
         $summaries = collect();
         
-        if ($user->hasRole(['Super Admin', 'Vice President'])) {
-            // Super Admin and Vice President see all employees
+        if ($user->hasRole('Super Admin')) {
+            // Super Admin sees all employees
             $summaries = User::role('Employee')
                 ->with(['reports' => function ($query) {
                     $query->whereMonth('report_date', now()->month)
@@ -54,8 +54,8 @@ class DashboardController extends Controller
                         'reports' => $user->reports
                     ];
                 });
-        } elseif ($user->hasRole(['Admin Divisi', 'Verifikator'])) {
-            // Admin Divisi and Verifikator see employees from their department
+        } elseif ($user->hasRole(['Vice President', 'Admin Divisi', 'Verifikator', 'Human Resource'])) {
+            // Vice President, Admin Divisi, Verifikator and Human Resource see employees from their department
             $summaries = User::role('Employee')
                 ->where('department_id', $user->department_id)
                 ->with(['reports' => function ($query) {
@@ -82,15 +82,15 @@ class DashboardController extends Controller
 
         // Get users without report today
         $usersWithoutReport = collect();
-        if ($user->hasRole(['Super Admin', 'Vice President'])) {
-            // Super Admin and Vice President see all users without reports
+        if ($user->hasRole('Super Admin')) {
+            // Super Admin sees all users without reports
             $usersWithoutReport = User::role('Employee')
                 ->whereDoesntHave('reports', function ($query) use ($today) {
                     $query->whereDate('report_date', $today);
                 })
                 ->get();
-        } elseif ($user->hasRole(['Admin Divisi', 'Verifikator'])) {
-            // Admin Divisi and Verifikator see department users without reports
+        } elseif ($user->hasRole(['Vice President', 'Admin Divisi', 'Verifikator', 'Human Resource'])) {
+            // Vice President, Admin Divisi, Verifikator and Human Resource see department users without reports
             $usersWithoutReport = User::role('Employee')
                 ->where('department_id', $user->department_id)
                 ->whereDoesntHave('reports', function ($query) use ($today) {
@@ -110,9 +110,9 @@ class DashboardController extends Controller
         // Calculate statistics based on role
         $reportsQuery = Report::query();
         
-        if ($user->hasRole(['Super Admin', 'Vice President'])) {
+        if ($user->hasRole('Super Admin')) {
             // No additional filters for Super Admin
-        } elseif ($user->hasRole(['Admin Divisi', 'Verifikator'])) {
+        } elseif ($user->hasRole(['Vice President', 'Admin Divisi', 'Verifikator', 'Human Resource'])) {
             // Filter by department
             $reportsQuery->whereHas('user', function($query) use ($user) {
                 $query->where('department_id', $user->department_id);

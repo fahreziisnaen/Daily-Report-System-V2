@@ -69,7 +69,7 @@ class User extends Authenticatable
 
     public function isAdmin()
     {
-        return $this->hasRole(['Super Admin', 'Admin Divisi', 'Vice President']);
+        return $this->hasRole(['Super Admin', 'Admin Divisi', 'Vice President', 'Human Resource']);
     }
 
     public function canModifyReport(Report $report)

@@ -13,7 +13,7 @@ class ReportPolicy
             return true;
         }
 
-        if ($user->hasRole('Vice President') || $user->hasRole('Admin Divisi') || $user->hasRole('Verifikator')) {
+        if ($user->hasRole('Vice President') || $user->hasRole('Admin Divisi') || $user->hasRole('Verifikator') || $user->hasRole('Human Resource')) {
             return $report->user->department_id === $user->department_id;
         }
 
@@ -30,7 +30,7 @@ class ReportPolicy
             return $report->user->department_id === $user->department_id;
         }
 
-        if ($user->hasRole('Admin Divisi') || $user->hasRole('Verifikator')) {
+        if ($user->hasRole('Admin Divisi') || $user->hasRole('Verifikator') || $user->hasRole('Human Resource')) {
             return $report->user_id === $user->id;
         }
 
@@ -47,7 +47,7 @@ class ReportPolicy
             return $report->user->department_id === $user->department_id;
         }
 
-        if ($user->hasRole('Admin Divisi') || $user->hasRole('Verifikator')) {
+        if ($user->hasRole('Admin Divisi') || $user->hasRole('Verifikator') || $user->hasRole('Human Resource')) {
             return $report->user_id === $user->id;
         }
 
@@ -65,8 +65,8 @@ class ReportPolicy
             return $report->user->department_id === $user->department_id;
         }
 
-        if ($user->hasRole('Verifikator')) {
-            // Verifikator cannot export reports
+        if ($user->hasRole('Verifikator') || $user->hasRole('Human Resource')) {
+            // Verifikator and Human Resource cannot export reports
             return false;
         }
 

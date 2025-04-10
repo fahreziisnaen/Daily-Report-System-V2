@@ -52,18 +52,49 @@
                             onchange="this.form.submit()">
                             <option value="">All Roles</option>
                             @foreach($roles as $role)
-                                <option value="{{ $role->name }}" {{ request('role') == $role->name ? 'selected' : '' }}>
+                                <option value="{{ $role->name }}" 
+                                    {{ request('role') == $role->name ? 'selected' : '' }}
+                                    class="
+                                    @if($role->name === 'Super Admin')
+                                        text-red-800 bg-red-50
+                                    @elseif($role->name === 'Admin Divisi')
+                                        text-blue-800 bg-blue-50
+                                    @elseif($role->name === 'Vice President')
+                                        text-purple-800 bg-purple-50
+                                    @elseif($role->name === 'Verifikator')
+                                        text-orange-800 bg-orange-50
+                                    @elseif($role->name === 'Human Resource')
+                                        text-pink-800 bg-pink-50
+                                    @else
+                                        text-green-800 bg-green-50
+                                    @endif
+                                    ">
                                     {{ ucfirst($role->name) }}
                                 </option>
                             @endforeach
                         </select>
                     </div>
+                    
+                    @role('Super Admin')
+                    <div class="w-full sm:w-auto">
+                        <select name="department" 
+                            class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                            onchange="this.form.submit()">
+                            <option value="">All Departments</option>
+                            @foreach($departments as $department)
+                                <option value="{{ $department->id }}" {{ request('department') == $department->id ? 'selected' : '' }}>
+                                    {{ $department->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    @endrole
                     <div class="w-full sm:w-auto flex gap-2">
                         <button type="submit" 
                             class="flex-1 sm:flex-none px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
                             Search
                         </button>
-                        @if(request()->hasAny(['search', 'role']))
+                        @if(request()->hasAny(['search', 'role', 'department']))
                             <a href="{{ route('admin.users.index') }}" 
                                 class="flex-1 sm:flex-none px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 text-center">
                                 Clear
@@ -89,7 +120,20 @@
                     <tbody class="bg-white divide-y divide-gray-200">
                         @foreach($users as $user)
                         <tr class="hover:bg-gray-50">
-                            <td class="px-3 py-2">
+                            <td class="px-3 py-2 border-l-4
+                            @if($user->roles->first()->name === 'Super Admin')
+                                border-red-500
+                            @elseif($user->roles->first()->name === 'Admin Divisi')
+                                border-blue-500
+                            @elseif($user->roles->first()->name === 'Vice President')
+                                border-purple-500
+                            @elseif($user->roles->first()->name === 'Verifikator')
+                                border-orange-500
+                            @elseif($user->roles->first()->name === 'Human Resource')
+                                border-pink-500
+                            @else
+                                border-green-500
+                            @endif">
                                 <div class="text-sm font-medium text-gray-900">{{ $user->name }}</div>
                                 <div class="text-sm text-gray-500 md:hidden">{{ $user->email }}</div>
                                 <div class="text-sm text-gray-500 md:hidden">{{ $user->position ?: '-' }}</div>
@@ -124,7 +168,22 @@
                                             class="w-full min-w-[150px] rounded-md border-gray-300 text-sm">
                                             @foreach($roles as $role)
                                                 <option value="{{ $role->name }}" 
-                                                    {{ $user->roles->first()->name === $role->name ? 'selected' : '' }}>
+                                                    {{ $user->roles->first()->name === $role->name ? 'selected' : '' }}
+                                                    class="
+                                                    @if($role->name === 'Super Admin')
+                                                        text-red-800 bg-red-50
+                                                    @elseif($role->name === 'Admin Divisi')
+                                                        text-blue-800 bg-blue-50
+                                                    @elseif($role->name === 'Vice President')
+                                                        text-purple-800 bg-purple-50
+                                                    @elseif($role->name === 'Verifikator')
+                                                        text-orange-800 bg-orange-50
+                                                    @elseif($role->name === 'Human Resource')
+                                                        text-pink-800 bg-pink-50
+                                                    @else
+                                                        text-green-800 bg-green-50
+                                                    @endif
+                                                    ">
                                                     {{ ucfirst($role->name) }}
                                                 </option>
                                             @endforeach
@@ -137,6 +196,12 @@
                                         bg-red-100 text-red-800
                                     @elseif($user->roles->first()->name === 'Admin Divisi')
                                         bg-blue-100 text-blue-800
+                                    @elseif($user->roles->first()->name === 'Vice President')
+                                        bg-purple-100 text-purple-800
+                                    @elseif($user->roles->first()->name === 'Verifikator')
+                                        bg-orange-100 text-orange-800
+                                    @elseif($user->roles->first()->name === 'Human Resource')
+                                        bg-pink-100 text-pink-800
                                     @else
                                         bg-green-100 text-green-800
                                     @endif">

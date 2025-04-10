@@ -254,9 +254,9 @@ class RekapController extends Controller
 
         // Get reports for the specified month and year
         $reports = $user->reports()
-            ->whereMonth('report_date', $month)
-            ->whereYear('report_date', $year)
-            ->orderBy('report_date')
+                ->whereMonth('report_date', $month)
+                ->whereYear('report_date', $year)
+                ->orderBy('report_date')
             ->get();
 
         // If no reports, redirect back with a message

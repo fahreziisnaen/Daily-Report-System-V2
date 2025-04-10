@@ -89,6 +89,16 @@ class RolePermissionSeeder extends Seeder
             'view-department-dashboard'
         ]);
 
+        // Create Human Resource role (same permissions as Verifikator)
+        $hrRole = Role::create(['name' => 'Human Resource']);
+        $hrRole->givePermissionTo([
+            'view-department-users',
+            'view-own-department',
+            'view-department-reports',
+            'manage-department-reports',
+            'view-department-dashboard'
+        ]);
+
         // Create Employee role
         $employeeRole = Role::create(['name' => 'Employee']);
         $employeeRole->givePermissionTo([

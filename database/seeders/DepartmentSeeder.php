@@ -12,34 +12,62 @@ class DepartmentSeeder extends Seeder
      */
     public function run(): void
     {
+        // Departemen dengan nama yang masuk akal
         $departments = [
             [
-                'name' => 'Project Engineering',
-                'code' => 'PE',
-                'description' => 'Department yang menangani proyek-proyek engineering',
+                'name' => 'IT',
+                'code' => 'IT',
+                'description' => 'Information Technology Department'
+            ],
+            [
+                'name' => 'Finance',
+                'code' => 'FIN',
+                'description' => 'Finance Department'
+            ],
+            [
+                'name' => 'Marketing',
+                'code' => 'MKT',
+                'description' => 'Marketing Department'
+            ],
+            [
+                'name' => 'Operations',
+                'code' => 'OPS',
+                'description' => 'Operations Department'
+            ],
+            [
+                'name' => 'Human Resources',
+                'code' => 'HR',
+                'description' => 'Human Resources Department'
+            ],
+            [
+                'name' => 'Sales',
+                'code' => 'SLS',
+                'description' => 'Sales Department'
             ],
             [
                 'name' => 'Production',
                 'code' => 'PRD',
-                'description' => 'Department yang menangani produksi',
+                'description' => 'Production Department'
             ],
             [
-                'name' => 'Quality Control',
-                'code' => 'QC',
-                'description' => 'Department yang menangani kontrol kualitas',
+                'name' => 'Research',
+                'code' => 'R&D',
+                'description' => 'Research and Development Department'
+            ],
+            [
+                'name' => 'Logistics',
+                'code' => 'LOG',
+                'description' => 'Logistics and Supply Chain Department'
             ],
             [
                 'name' => 'Maintenance',
                 'code' => 'MNT',
-                'description' => 'Department yang menangani perawatan mesin dan fasilitas',
-            ],
+                'description' => 'Maintenance and Facilities Department'
+            ]
         ];
 
         foreach ($departments as $department) {
-            Department::updateOrCreate(
-                ['code' => $department['code']],
-                $department
-            );
+            Department::create($department);
         }
     }
 } 

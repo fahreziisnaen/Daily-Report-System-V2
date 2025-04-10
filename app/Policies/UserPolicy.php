@@ -12,7 +12,7 @@ class UserPolicy
             return true;
         }
 
-        if ($user->hasRole('Vice President') || $user->hasRole('Admin Divisi')) {
+        if ($user->hasRole('Vice President') || $user->hasRole('Admin Divisi') || $user->hasRole('Human Resource')) {
             return $targetUser->department_id === $user->department_id;
         }
 

@@ -131,7 +131,7 @@ class DatabaseSeeder extends Seeder
                 ]
             ]
         ];
-        
+
         // Create reports for all users
         $allUsers = $employees->merge($adminDivisis);
         $now = now();
@@ -161,8 +161,8 @@ class DatabaseSeeder extends Seeder
                     'created_at' => now(),
                     'updated_at' => now()
                 ];
-                
-                $report = Report::create($reportData);
+            
+            $report = Report::create($reportData);
                 
                 // Create report details
                 foreach ($template['details'] as $detail) {
