@@ -76,6 +76,37 @@
                                 </select>
                             </div>
 
+                            <!-- Verifikator -->
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Verifikator</label>
+                                <select name="verifikator_id" id="verifikator_id" 
+                                    class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base"
+                                    required onchange="loadVicePresidents()">
+                                    <option value="">Pilih Verifikator</option>
+                                    @foreach($verifikators as $verifikator)
+                                        <option value="{{ $verifikator->id }}" {{ $report->verifikator_id == $verifikator->id ? 'selected' : '' }}>{{ $verifikator->name }}</option>
+                                    @endforeach
+                                </select>
+                                @error('verifikator_id')
+                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
+                            </div>
+                            
+                            <!-- Vice President (Disabled) -->
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Vice President</label>
+                                <select name="vp_id" id="vp_id" 
+                                    class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base bg-gray-100"
+                                    required readonly>
+                                    <option value="{{ $report->vp_id }}">{{ $report->vp ? $report->vp->name : 'Vice President akan dipilih otomatis' }}</option>
+                                </select>
+                                <!-- Hidden input to ensure vp_id is submitted even if the select is disabled -->
+                                <input type="hidden" name="vp_id" value="{{ $report->vp_id }}">
+                                @error('vp_id')
+                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
+                            </div>
+
                             <!-- Lokasi -->
                             <div class="mb-4" x-data="{ 
                                 locationType: '{{ $report->location === auth()->user()->homebase ? 'homebase' : 'dinas' }}'
@@ -127,14 +158,14 @@
                                         <label class="block text-sm font-medium text-gray-700 mb-1">Jam Mulai</label>
                                         <input type="time" name="start_time" 
                                             class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base"
-                                            value="{{ old('start_time', $report->start_time) }}"
+                                            value="{{ old('start_time', Carbon\Carbon::parse($report->start_time)->format('H:i')) }}"
                                             required>
                                     </div>
                                     <div>
                                         <label class="block text-sm font-medium text-gray-700 mb-1">Jam Selesai</label>
                                         <input type="time" name="end_time" 
                                             class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base"
-                                            value="{{ old('end_time', $report->end_time) }}"
+                                            value="{{ old('end_time', Carbon\Carbon::parse($report->end_time)->format('H:i')) }}"
                                             required>
                                     </div>
                                 </div>
@@ -232,17 +263,14 @@
                         </div>
 
                         <!-- Action Buttons -->
-                        <div class="fixed bottom-0 left-0 right-0 bg-white/95 border-t border-gray-200 p-4 z-50 backdrop-blur-sm md:relative md:border-0 md:bg-transparent md:p-0 md:backdrop-blur-none">
-                            <div class="flex justify-end space-x-3 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                                <a href="{{ route('reports.show', $report) }}" 
-                                    class="flex-1 md:flex-none inline-flex justify-center items-center px-4 py-2 bg-gray-100 text-gray-700 rounded-md text-sm font-medium hover:bg-gray-200">
-                                    Batal
-                                </a>
-                                <button type="submit" 
-                                    class="flex-1 md:flex-none inline-flex justify-center items-center px-4 py-2 bg-indigo-600 text-white rounded-md text-sm font-medium hover:bg-indigo-700">
-                                    Update
-                                </button>
-                            </div>
+                        <div class="bg-white px-4 py-3 text-right sm:px-6 flex justify-end gap-3">
+                            <x-secondary-button :href="route('reports.show', $report)">
+                                {{ __('Batal') }}
+                            </x-secondary-button>
+                            
+                            <button type="submit" class="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                {{ __('Simpan') }}
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -258,6 +286,13 @@
             const dateInput = document.getElementById('report_date');
             const workDayKerja = document.getElementById('work_day_type_kerja');
             const workDayLibur = document.getElementById('work_day_type_libur');
+            
+            // Inisialisasi lokasi
+            const isHomebase = '{{ $report->location }}' === '{{ auth()->user()->homebase }}';
+            const locationType = document.querySelector('input[name="location_type"][value="' + (isHomebase ? 'homebase' : 'dinas') + '"]');
+            if (locationType) {
+                locationType.checked = true;
+            }
             
             function checkIfSunday(date) {
                 const day = new Date(date).getDay();
@@ -293,6 +328,9 @@
                     const projectSelect = document.querySelector('[name="project_code"]');
                     const currentProject = '{{ $report->project_code }}';
                     
+                    // Hapus option default jika ada
+                    projectSelect.innerHTML = '<option value="">Pilih Project</option>';
+                    
                     projects.forEach(project => {
                         const option = document.createElement('option');
                         option.value = project.code;
@@ -302,7 +340,13 @@
                         }
                         projectSelect.appendChild(option);
                     });
+                })
+                .catch(error => {
+                    console.error('Error loading projects:', error);
                 });
+
+            // Load VP based on selected verifikator
+            loadVicePresidents();
         });
 
         function addWorkDetail() {
@@ -338,6 +382,68 @@
             `;
             container.appendChild(detail);
             detailCount++;
+        }
+
+        function loadVicePresidents() {
+            const verifikatorId = document.getElementById('verifikator_id').value;
+            const vpSelect = document.getElementById('vp_id');
+            const vpHiddenInput = document.querySelector('input[type="hidden"][name="vp_id"]');
+            const currentVpId = '{{ $report->vp_id }}';
+            const currentVpName = '{{ $report->vp ? $report->vp->name : "Vice President akan dipilih otomatis" }}';
+            
+            if (!verifikatorId) {
+                // Jika tidak ada verifikator yang dipilih, tetap gunakan VP saat ini jika ada
+                if (currentVpId) {
+                    vpSelect.innerHTML = `<option value="${currentVpId}">${currentVpName}</option>`;
+                    vpHiddenInput.value = currentVpId;
+                } else {
+                    vpSelect.innerHTML = '<option value="">Vice President akan dipilih otomatis</option>';
+                    vpHiddenInput.value = '';
+                }
+                return;
+            }
+            
+            // Fetch Vice Presidents based on selected Verifikator's department
+            fetch(`/vice-presidents?verifikator_id=${verifikatorId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length > 0) {
+                        vpSelect.innerHTML = '';
+                        
+                        // Cek apakah VP saat ini masih dalam list
+                        let vpFound = false;
+                        
+                        data.forEach(vp => {
+                            const option = document.createElement('option');
+                            option.value = vp.id;
+                            option.textContent = vp.name;
+                            
+                            // Pilih VP yang saat ini sudah disimpan jika ada dalam list
+                            if (vp.id == currentVpId) {
+                                option.selected = true;
+                                vpFound = true;
+                            }
+                            
+                            vpSelect.appendChild(option);
+                        });
+                        
+                        // Jika VP saat ini tidak ditemukan, pilih yang pertama
+                        if (!vpFound && data.length > 0) {
+                            vpSelect.value = data[0].id;
+                        }
+                        
+                        // Update hidden input
+                        vpHiddenInput.value = vpSelect.value;
+                    } else {
+                        vpSelect.innerHTML = '<option value="">Tidak ada VP tersedia</option>';
+                        vpHiddenInput.value = '';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching Vice Presidents:', error);
+                    vpSelect.innerHTML = '<option value="">Error loading data</option>';
+                    vpHiddenInput.value = '';
+                });
         }
     </script>
     @endpush

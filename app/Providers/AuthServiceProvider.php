@@ -30,12 +30,17 @@ class AuthServiceProvider extends ServiceProvider
 
         // Define admin gate
         Gate::define('admin', function ($user) {
-            return $user->hasRole('Super Admin') || $user->hasRole('Admin Divisi') || $user->hasRole('Vice President') || $user->hasRole('Verifikator') || $user->hasRole('Human Resource');
+            return $user->isAdmin();
+        });
+
+        // Define HR review gate
+        Gate::define('hr-review', function ($user) {
+            return $user->isHumanResource();
         });
 
         // Implicitly grant "Super Admin" role all permissions
         Gate::before(function ($user, $ability) {
-            if ($user->hasRole('Super Admin')) {
+            if ($user->isFullAdmin()) {
                 return true;
             }
         });

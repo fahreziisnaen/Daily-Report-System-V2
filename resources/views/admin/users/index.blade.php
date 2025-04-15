@@ -216,8 +216,8 @@
                             </td>
                             <td class="px-3 py-2 text-right">
                                 <div class="flex items-center justify-end gap-3">
+                                    @can('update', $user)
                                     <!-- Edit User -->
-                                    @if(!auth()->user()->hasRole('Admin Divisi') || !$user->hasRole('Super Admin'))
                                     <a href="{{ route('admin.users.edit', $user) }}" 
                                         class="text-blue-600 hover:text-blue-900"
                                         title="Edit User">
@@ -237,6 +237,7 @@
                                     </button>
 
                                     <!-- Activate/Deactivate User -->
+                                    @can('toggleActive', $user)
                                     @if($user->is_active)
                                         <button type="button" 
                                             @click="$dispatch('open-modal', 'deactivate-user-{{ $user->id }}')" 
@@ -259,8 +260,10 @@
                                             </button>
                                         </form>
                                     @endif
+                                    @endcan
                                     
                                     <!-- Delete User -->
+                                    @can('delete', $user)
                                     <button type="button"
                                         @click="$dispatch('open-modal', 'delete-user-{{ $user->id }}')"
                                             class="text-red-600 hover:text-red-900"
@@ -269,29 +272,30 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                                             </svg>
                                         </button>
+                                    @endcan
                                     @else
-                                    <!-- Show disabled buttons for Super Admin users when viewed by Admin Divisi -->
-                                    <span class="text-gray-400 cursor-not-allowed" title="You cannot edit Super Admin users">
+                                    <!-- Show disabled buttons -->
+                                    <span class="text-gray-400 cursor-not-allowed" title="You cannot edit this user">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
                                         </svg>
                                     </span>
-                                    <span class="text-gray-400 cursor-not-allowed" title="You cannot reset password for Super Admin users">
+                                    <span class="text-gray-400 cursor-not-allowed" title="You cannot reset password for this user">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
                                         </svg>
                                     </span>
-                                    <span class="text-gray-400 cursor-not-allowed" title="You cannot deactivate Super Admin users">
+                                    <span class="text-gray-400 cursor-not-allowed" title="You cannot deactivate this user">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path>
                                         </svg>
                                     </span>
-                                    <span class="text-gray-400 cursor-not-allowed" title="You cannot delete Super Admin users">
+                                    <span class="text-gray-400 cursor-not-allowed" title="You cannot delete this user">
                                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                                         </svg>
                                     </span>
-                                    @endif
+                                    @endcan
                                 </div>
                             </td>
                         </tr>
@@ -411,9 +415,9 @@
         </form>
     </x-modal>
 
-    <!-- Delete User Modal -->
+    <!-- Delete, Reset Password, and Deactivate User Modals -->
     @foreach($users as $user)
-        @if(!auth()->user()->hasRole('Admin Divisi') || !$user->hasRole('Super Admin'))
+        @can('delete', $user)
         <x-modal name="delete-user-{{ $user->id }}" :show="false">
             <form method="POST" action="{{ route('admin.users.destroy', $user) }}" class="p-6">
             @csrf
@@ -437,40 +441,49 @@
             </div>
         </form>
     </x-modal>
+        @endcan
 
+        @can('update', $user)
         <!-- Reset Password Modal -->
         <x-modal name="reset-password-{{ $user->id }}" :show="false">
             <form method="POST" action="{{ route('admin.users.reset-password', $user) }}" class="p-6">
-            @csrf
-            <h2 class="text-lg font-medium text-gray-900">
+                @csrf
+                @method('PUT')
+                <h2 class="text-lg font-medium text-gray-900">
                     {{ __('Reset Password') }}
-            </h2>
+                </h2>
 
+                <p class="mt-4 text-sm text-gray-600">
+                    {{ __('This action will reset the password for this user. The new password will be sent to the user\'s email address.') }}
+                </p>
+                
                 <div class="mt-4">
-                    <x-input-label for="new_password" :value="__('New Password')" />
-                    <x-text-input id="new_password" name="new_password" type="password" class="mt-1 block w-full" required />
-                    <x-input-error class="mt-2" :messages="$errors->get('new_password')" />
-            </div>
-
-                <div class="mt-4">
-                    <x-input-label for="new_password_confirmation" :value="__('Confirm New Password')" />
-                    <x-text-input id="new_password_confirmation" name="new_password_confirmation" type="password" class="mt-1 block w-full" required />
-                    <x-input-error class="mt-2" :messages="$errors->get('new_password_confirmation')" />
+                    <x-input-label for="new_password_{{ $user->id }}" :value="__('New Password')" />
+                    <x-text-input id="new_password_{{ $user->id }}" name="password" type="password" class="mt-1 block w-full" required />
+                    <x-input-error :messages="$errors->updatePassword->get('password')" class="mt-2" />
                 </div>
 
-            <div class="mt-6 flex justify-end">
-                <x-secondary-button x-on:click="$dispatch('close')">
-                        {{ __('Cancel') }}
-                </x-secondary-button>
+                <div class="mt-4">
+                    <x-input-label for="password_confirmation_{{ $user->id }}" :value="__('Confirm Password')" />
+                    <x-text-input id="password_confirmation_{{ $user->id }}" name="password_confirmation" type="password" class="mt-1 block w-full" required />
+                    <x-input-error :messages="$errors->updatePassword->get('password_confirmation')" class="mt-2" />
+                </div>
 
-                <x-primary-button class="ml-3">
+                <div class="mt-6 flex justify-end">
+                    <x-secondary-button x-on:click="$dispatch('close')">
+                        {{ __('Cancel') }}
+                    </x-secondary-button>
+
+                    <x-primary-button class="ml-3">
                         {{ __('Reset Password') }}
-                </x-primary-button>
-            </div>
-        </form>
-    </x-modal>
+                    </x-primary-button>
+                </div>
+            </form>
+        </x-modal>
+        @endcan
 
         <!-- Deactivate User Modal -->
+        @can('toggleActive', $user)
         @if($user->is_active)
         <x-modal name="deactivate-user-{{ $user->id }}" :show="false">
             <form method="POST" action="{{ route('admin.users.toggle-active', $user) }}" class="p-6">
@@ -481,8 +494,9 @@
             </h2>
 
                 <div class="mt-4">
-                    <x-input-label for="reason" :value="__('Reason for Deactivation (Optional)')" />
-                    <textarea id="reason" name="reason" class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm" rows="3"></textarea>
+                    <x-input-label for="inactive_reason" :value="__('Reason for Deactivation')" />
+                    <textarea id="inactive_reason" name="inactive_reason" class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm" rows="3" required></textarea>
+                    <p class="mt-1 text-sm text-gray-500">{{ __('This reason will be stored and visible to administrators.') }}</p>
             </div>
 
             <div class="mt-6 flex justify-end">
@@ -497,6 +511,6 @@
         </form>
     </x-modal>
         @endif
-        @endif
+        @endcan
     @endforeach
 </x-app-layout>

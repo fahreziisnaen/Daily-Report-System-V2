@@ -69,9 +69,24 @@ class RekapController extends Controller
         $usersQuery = User::query();
 
         // Filter users based on role
-        if ($user->hasRole(['Admin Divisi', 'Verifikator', 'Vice President'])) {
-            $usersQuery->where('department_id', $user->department_id);
-        } elseif (!$user->hasRole('Super Admin')) {
+        if ($user->hasRole('Verifikator') || $user->hasRole('Admin Divisi')) {
+            // Tampilkan laporan milik sendiri dan karyawan satu departemen
+            $usersQuery->where(function($query) use ($user) {
+                $query->where('id', $user->id)
+                    ->orWhere('department_id', $user->department_id);
+            });
+        } elseif ($user->hasRole('Vice President')) {
+            // Tampilkan laporan semua karyawan satu departemen kecuali VP sendiri
+            $usersQuery->where('department_id', $user->department_id)
+                ->where('id', '!=', $user->id);
+        } elseif ($user->hasRole('Human Resource')) {
+            // Tampilkan laporan milik sendiri dan semua karyawan semua departemen
+            $usersQuery->where(function($query) use ($user) {
+                $query->where('id', $user->id)
+                    ->orWhereNotNull('department_id');
+            });
+        } else {
+            // Regular employees only see their own reports
             $usersQuery->where('id', $user->id);
         }
 
@@ -89,6 +104,16 @@ class RekapController extends Controller
             $users->push($userData);
         }
 
+        // Get reviewed reports for the current month and year
+        $reviewedReports = Report::with(['user', 'reviewer', 'user.department'])
+            ->whereMonth('report_date', $month)
+            ->whereYear('report_date', $year)
+            ->whereIn('status', [Report::STATUS_COMPLETED, Report::STATUS_REJECTED_BY_HR])
+            ->whereNotNull('reviewed_at')
+            ->whereNotNull('reviewed_by')
+            ->orderBy('reviewed_at', 'desc')
+            ->get();
+
         // Get departments for filter
         $departments = Department::orderBy('name')->get();
         
@@ -98,7 +123,7 @@ class RekapController extends Controller
         // Get years for dropdown (current year and previous year)
         $years = range(date('Y') - 1, date('Y') + 1);
 
-        return view('rekap.index', compact('users', 'departments', 'months', 'years', 'month', 'year'));
+        return view('rekap.index', compact('users', 'departments', 'months', 'years', 'month', 'year', 'reviewedReports'));
     }
 
     private function getMonths()
@@ -123,8 +148,14 @@ class RekapController extends Controller
     {
         $authUser = auth()->user();
         
-        // Only Super Admin, Vice President, and Admin Divisi can export
-        if (!$authUser->hasRole(['Super Admin', 'Vice President', 'Admin Divisi'])) {
+        // Update the permissions to allow Verifikator to export for users in their department
+        if ($authUser->hasRole('Verifikator')) {
+            // Verifikator can only export users from their department
+            if ($user->department_id !== $authUser->department_id) {
+                return redirect()->route('rekap.index')
+                    ->with('error', 'Anda hanya dapat mengekspor rekap untuk pengguna di departemen Anda.');
+            }
+        } elseif (!$authUser->hasRole(['Super Admin', 'Vice President', 'Admin Divisi'])) {
             return redirect()->route('rekap.index')
                 ->with('error', 'Anda tidak memiliki izin untuk mengekspor rekap.');
         }
@@ -139,7 +170,7 @@ class RekapController extends Controller
         $month = $request->get('month', now()->month);
         $year = $request->get('year', now()->year);
 
-        // Get reports for the specified month and year
+        // Get all reports for the specified month and year
         $reports = $user->reports()
             ->whereMonth('report_date', $month)
             ->whereYear('report_date', $year)
@@ -148,8 +179,8 @@ class RekapController extends Controller
 
         // If no reports, redirect back with a message
         if ($reports->count() === 0) {
-            return redirect()->route('admin.rekap.index')
-                ->with('error', 'Tidak ada laporan untuk diexport pada periode yang dipilih.');
+            return redirect()->route($authUser->hasRole(['Super Admin', 'Vice President', 'Admin Divisi']) ? 'admin.rekap.index' : 'rekap.index')
+                ->with('error', 'Tidak ada laporan untuk periode yang dipilih.');
         }
 
         try {
@@ -233,17 +264,43 @@ class RekapController extends Controller
         $year = $request->get('year', date('Y'));
         $user = auth()->user();
 
-        // Get only the current user's data
-        $userData = $this->processUserData($user, $month, $year);
-
-        $months = [];
-        for($i = 1; $i <= 12; $i++) {
-            $months[$i] = Carbon::create(null, $i, 1)->format('F');
+        // Fetch all reports from the user(s), not just HR-reviewed ones
+        $allReports = Report::with(['user', 'reviewer'])
+            ->orderBy('report_date', 'desc')
+            ->get();
+        
+        // Jika user adalah Verifikator, tampilkan semua pengguna di departemen yang sama
+        if ($user->hasRole('Verifikator')) {
+            $usersQuery = User::where('department_id', $user->department_id);
+            
+            // Get users and process their data
+            $rawUsers = $usersQuery->get();
+            $users = collect();
+            
+            foreach ($rawUsers as $userItem) {
+                $userData = $this->processUserData($userItem, $month, $year);
+                $users->push($userData);
+            }
+            
+            $months = $this->getMonths();
+            $years = range(date('Y') - 1, date('Y') + 1);
+            
+            return view('rekap.index', compact('users', 'months', 'years', 'month', 'year', 'allReports'));
         }
+        // Untuk user biasa, tampilkan hanya data mereka sendiri
+        else {
+            // Get only the current user's data
+            $userData = $this->processUserData($user, $month, $year);
 
-        $years = range(date('Y') - 1, date('Y') + 1);
+            $months = [];
+            for($i = 1; $i <= 12; $i++) {
+                $months[$i] = Carbon::create(null, $i, 1)->format('F');
+            }
 
-        return view('rekap.employee', compact('userData', 'months', 'month', 'years', 'year'));
+            $years = range(date('Y') - 1, date('Y') + 1);
+
+            return view('rekap.employee', compact('userData', 'months', 'month', 'years', 'year', 'allReports'));
+        }
     }
 
     public function employeeExport(Request $request)
@@ -252,17 +309,17 @@ class RekapController extends Controller
         $year = $request->get('year', now()->year);
         $user = auth()->user();
 
-        // Get reports for the specified month and year
+        // Get all reports for the specified month and year (not just HR-reviewed ones)
         $reports = $user->reports()
                 ->whereMonth('report_date', $month)
                 ->whereYear('report_date', $year)
                 ->orderBy('report_date')
-            ->get();
+                ->get();
 
         // If no reports, redirect back with a message
         if ($reports->count() === 0) {
             return redirect()->route('rekap.index')
-                ->with('error', 'Tidak ada laporan untuk diexport pada periode yang dipilih.');
+                ->with('error', 'Tidak ada laporan untuk periode yang dipilih.');
         }
 
         try {
@@ -342,6 +399,7 @@ class RekapController extends Controller
 
     private function processUserData(User $user, $month, $year)
     {
+        // Get all reports for the specified month and year
         $reports = $user->reports()
             ->whereMonth('report_date', $month)
             ->whereYear('report_date', $year)
@@ -360,9 +418,94 @@ class RekapController extends Controller
         return [
             'id' => $user->id,
             'name' => $user->name,
+            'department_id' => $user->department_id,
             'total_work_hours' => round($totalWorkHours, 2),
             'total_overtime_hours' => round($totalOvertimeHours, 2),
             'report_count' => $reportCount
         ];
+    }
+
+    /**
+     * Rekap khusus untuk role Human Resource
+     * Menampilkan ringkasan laporan dari semua departemen yang telah direview oleh HR
+     * 
+     * @param Request $request
+     * @return \Illuminate\View\View
+     */
+    public function hrRekap(Request $request)
+    {
+        if (!auth()->user()->hasRole('Human Resource')) {
+            abort(403, 'Unauthorized action.');
+        }
+
+        $month = $request->get('month', date('n'));
+        $year = $request->get('year', date('Y'));
+        
+        // Get all departments
+        $departments = Department::orderBy('name')->get();
+        
+        // Department filter (optional for HR)
+        $departmentId = $request->get('department');
+        
+        // Get users and process their data - only reports reviewed by HR are included
+        $usersQuery = User::query()
+            ->whereDoesntHave('roles', function($query) {
+                $query->whereIn('name', ['Super Admin', 'Vice President']);
+            });
+        
+        // Apply department filter if selected
+        if ($departmentId) {
+            $usersQuery->where('department_id', $departmentId);
+        }
+        
+        // Fetch users - note: processUserData already filters for HR reviewed reports
+        $rawUsers = $usersQuery->get();
+        $users = collect();
+        
+        foreach ($rawUsers as $user) {
+            $userData = $this->processUserData($user, $month, $year);
+            $users->push($userData);
+        }
+        
+        // Base query for report statistics
+        $reportsQuery = Report::query()
+            ->whereMonth('report_date', $month)
+            ->whereYear('report_date', $year)
+            ->whereHas('user', function($query) {
+                $query->whereDoesntHave('roles', function($q) {
+                    $q->whereIn('name', ['Super Admin', 'Vice President']);
+                });
+            });
+            
+        // Apply department filter if selected
+        if ($departmentId) {
+            $reportsQuery->whereHas('user', function($query) use ($departmentId) {
+                $query->where('department_id', $departmentId);
+            });
+        }
+        
+        // Get report status statistics for HR view - focus only on HR-related statuses
+        $reportStatusStats = [
+            'pending_hr' => (clone $reportsQuery)->where('status', Report::STATUS_PENDING_HR)->count(),
+            'completed' => (clone $reportsQuery)->where('status', Report::STATUS_COMPLETED)->count(),
+            'rejected_hr' => (clone $reportsQuery)->where('status', Report::STATUS_REJECTED_BY_HR)->count(),
+        ];
+        
+        // Get months for dropdown
+        $months = $this->getMonths();
+        
+        // Get years for dropdown (current year and previous/next years)
+        $years = range(date('Y') - 1, date('Y') + 1);
+        
+        return view('rekap.hr', compact(
+            'users', 
+            'departments', 
+            'months', 
+            'years', 
+            'month', 
+            'year', 
+            'departmentId',
+            'reportStatusStats'
+        ));
     }
 } 

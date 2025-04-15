@@ -8,6 +8,9 @@ use App\Models\Project;
 use App\Models\Report;
 use App\Models\ReportDetail;
 use App\Models\User;
+use App\Services\ReportService;
+use App\Http\Requests\StoreReportRequest;
+use App\Http\Requests\UpdateReportRequest;
 use Illuminate\Http\Request;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use PhpOffice\PhpSpreadsheet\IOFactory;
@@ -22,194 +25,75 @@ use PhpOffice\PhpSpreadsheet\Style\Fill;
 class ReportController extends Controller
 {
     use AuthorizesRequests;
+    
+    protected $reportService;
+    
+    public function __construct(ReportService $reportService)
+    {
+        $this->reportService = $reportService;
+    }
 
     public function index(Request $request)
     {
-        $query = Report::with('user', 'details')->orderBy('report_date', 'desc');
         $authUser = auth()->user();
         
-        // Filter reports based on user role
-        if ($authUser->hasRole('Super Admin')) {
-            // Super Admin sees all reports
-            // No additional filtering needed
-        } 
-        elseif ($authUser->hasRole('Vice President') || $authUser->hasRole('Admin Divisi') || $authUser->hasRole('Verifikator')) {
-            // Vice President, Admin Divisi, and Verifikator only see reports from their department
-            $query->whereHas('user', function ($q) use ($authUser) {
-                $q->where('department_id', $authUser->department_id);
-            });
-            
-            // Additional employee search if provided
-            if ($request->filled('employee_search')) {
-                $query->whereHas('user', function ($q) use ($request) {
-                    $q->where('name', 'like', '%' . $request->employee_search . '%');
-                });
-            }
-        } 
-        else {
-            // Regular employees only see their own reports
-            $query->where('user_id', $authUser->id);
-        }
+        // Use service for filtering reports
+        $reports = $this->reportService->getFilteredReports($authUser, $request);
         
-        // Filter by date if provided
-        if ($request->filled('report_date')) {
-            $query->whereDate('report_date', $request->report_date);
-        }
+        // Get filter options from service
+        $filterOptions = $this->reportService->getFilterOptions($authUser);
         
-        // Filter by location if provided
-        if ($request->filled('location')) {
-            $query->where('location', $request->location);
-        }
-        
-        // Filter by project code if provided
-        if ($request->filled('project_code')) {
-            $query->where('project_code', $request->project_code);
-        }
-
-        $reports = $query->paginate(10)->withQueryString();
-
-        // Get unique employee names for filter dropdown (for admins)
-        $employees = '[]';
-        if ($authUser->isAdmin()) {
-            // For Vice President, Admin Divisi, and Verifikator, only show employees from their department
-            $employeesQuery = User::orderBy('name');
-            
-            if ($authUser->hasRole(['Vice President', 'Admin Divisi', 'Verifikator'])) {
-                $employeesQuery->where('department_id', $authUser->department_id);
-            }
-            
-            $employees = $employeesQuery->pluck('name')->toJson();
-        }
-        
-        // Get unique locations for filter dropdown
-        $locationsQuery = Report::distinct()->orderBy('location');
-        
-        // Restrict locations based on role
-        if ($authUser->hasRole(['Vice President', 'Admin Divisi', 'Verifikator'])) {
-            $locationsQuery->whereHas('user', function ($q) use ($authUser) {
-                $q->where('department_id', $authUser->department_id);
-            });
-        } elseif (!$authUser->hasRole('Super Admin')) {
-            $locationsQuery->where('user_id', $authUser->id);
-        }
-        
-        $locations = $locationsQuery->pluck('location')->filter()->values()->toJson();
-        
-        // Get unique project codes for filter dropdown
-        $projectCodesQuery = Report::distinct()->orderBy('project_code');
-        
-        // Restrict project codes based on role
-        if ($authUser->hasRole(['Vice President', 'Admin Divisi', 'Verifikator'])) {
-            $projectCodesQuery->whereHas('user', function ($q) use ($authUser) {
-                $q->where('department_id', $authUser->department_id);
-            });
-        } elseif (!$authUser->hasRole('Super Admin')) {
-            $projectCodesQuery->where('user_id', $authUser->id);
-        }
-        
-        $projectCodes = $projectCodesQuery->pluck('project_code')->filter()->values()->toJson();
-        
-        return view('reports.index', compact('reports', 'employees', 'locations', 'projectCodes'));
+        return view('reports.index', [
+            'reports' => $reports,
+            'employees' => $filterOptions['employees'],
+            'locations' => $filterOptions['locations'],
+            'projectCodes' => $filterOptions['projectCodes']
+        ]);
     }
 
     public function create()
     {
-        return view('reports.create');
-    }
-
-    private function isOvertime($start_time, $end_time, $is_overnight = false, $work_day_type = 'Hari Kerja', $report_date = null)
-    {
-        // Log input parameters
-        \Log::info('Overtime Calculation Input', [
-            'start_time' => $start_time,
-            'end_time' => $end_time,
-            'is_overnight' => $is_overnight,
-            'work_day_type' => $work_day_type,
-            'report_date' => $report_date
-        ]);
-
-        $date = $report_date ? Carbon::parse($report_date) : Carbon::today();
-        $dayOfWeek = $date->dayOfWeek;
-
-        $start = Carbon::parse($report_date . ' ' . $start_time);
-        $end = Carbon::parse($report_date . ' ' . $end_time);
+        // Block Vice Presidents from creating reports
+        if (auth()->user()->isVicePresident()) {
+            return redirect()->route('reports.index')
+                ->with('error', 'Vice President tidak diizinkan membuat laporan.');
+        }
         
-        if ($is_overnight) {
-            $end->addDay();
-        }
-
-        // Gunakan diffInMinutes(true) untuk mendapatkan nilai absolut
-        $totalMinutes = $end->diffInMinutes($start, true);
-        $totalHours = $totalMinutes / 60;
-
-        // Jika hari Minggu (0) atau hari libur, otomatis overtime
-        if ($dayOfWeek == 0 || $work_day_type === 'Hari Libur') {
-            return true;
-        }
-
-        // Untuk hari kerja (Senin-Jumat)
-        if ($dayOfWeek >= 1 && $dayOfWeek <= 5) {
-            return $totalHours > 8.25; // Ubah dari >= menjadi >
-        }
-        // Untuk hari Sabtu
-        else if ($dayOfWeek == 6) {
-            return $totalHours > 4.25; // Ubah dari >= menjadi >
-        }
-
-        return false;
+        // Get verifikators from service
+        $verifikators = $this->reportService->getVerifikators();
+        
+        return view('reports.create', compact('verifikators'));
     }
 
-    public function store(Request $request)
+    public function store(StoreReportRequest $request)
     {
-        // Cek apakah sudah ada laporan di tanggal yang sama untuk user ini
-        $existingReport = Report::where('user_id', auth()->id())
-            ->where('report_date', $request->report_date)
-            ->first();
-
-        if ($existingReport) {
+        // Block Vice Presidents from creating reports
+        if (auth()->user()->isVicePresident()) {
+            return redirect()->route('reports.index')
+                ->with('error', 'Vice President tidak diizinkan membuat laporan.');
+        }
+        
+        // Check for existing report
+        if ($this->reportService->reportExistsForDate(auth()->id(), $request->report_date)) {
             return back()
                 ->withInput()
                 ->withErrors(['report_date' => 'Laporan pada tanggal tersebut sudah ada.']);
         }
 
-        $request->validate([
-            'report_date' => 'required|date',
-            'project_code' => 'required|string',
-            'location' => 'required|string',
-            'start_time' => 'required',
-            'end_time' => 'required',
-            'work_day_type' => 'required|in:Hari Kerja,Hari Libur',
-            'work_details' => 'required|array|min:1',
-            'work_details.*.description' => 'required|string',
-            'work_details.*.status' => 'required|in:Selesai,Dalam Proses,Tertunda,Bermasalah',
-        ]);
-
-        $is_overtime = $this->isOvertime(
-            $request->start_time, 
-            $request->end_time,
-            $request->boolean('is_overnight'),
-            $request->work_day_type,
-            $request->report_date
-        );
-
-        $report = Report::create([
-            'user_id' => auth()->id(),
-            'report_date' => $request->report_date,
-            'project_code' => $request->project_code,
-            'location' => $request->location,
-            'start_time' => $request->start_time,
-            'end_time' => $request->end_time,
-            'is_overnight' => $request->boolean('is_overnight'),
-            'is_shift' => $request->boolean('is_shift'),
-            'is_overtime' => $is_overtime,
-            'work_day_type' => $request->work_day_type,
-        ]);
-
-        foreach ($request->work_details as $detail) {
-            $report->details()->create([
-                'description' => $detail['description'],
-                'status' => $detail['status'],
-            ]);
+        // Create report using service, teruskan user ID secara eksplisit
+        $report = $this->reportService->createReport($request->validated(), auth()->id());
+        
+        // Check if submitting user is a verifikator who selected themselves
+        $user = auth()->user();
+        $isOvertimeReport = $report->is_overtime;
+        
+        if ($isOvertimeReport && $user->hasRole('Verifikator') && $report->verifikator_id == $user->id) {
+            // Auto-verify the report and send directly to VP
+            $autoVerified = $this->reportService->submitVerifikatorOwnReport($report, $user->id);
+            if ($autoVerified) {
+                return redirect()->route('reports.show', $report)
+                    ->with('success', 'Laporan berhasil dibuat dan otomatis diverifikasi. Laporan dikirim ke Vice President.');
+            }
         }
 
         return redirect()->route('reports.show', $report)
@@ -224,60 +108,33 @@ class ReportController extends Controller
 
     public function edit(Report $report)
     {
+        // Block Vice Presidents from editing reports
+        if (auth()->user()->isVicePresident()) {
+            return redirect()->route('reports.index')
+                ->with('error', 'Vice President tidak diizinkan mengedit laporan.');
+        }
+        
         $this->authorize('update', $report);
-        return view('reports.edit', compact('report'));
+        
+        // Get verifikators from service
+        $verifikators = $this->reportService->getVerifikators();
+        
+        // Get vice presidents from service if verifikator is assigned
+        $vps = collect();
+        if ($report->verifikator) {
+            $vps = $this->reportService->getVicePresidents($report->verifikator->department_id);
+        }
+        
+        return view('reports.edit', compact('report', 'verifikators', 'vps'));
     }
 
-    public function update(Request $request, Report $report)
+    public function update(UpdateReportRequest $request, Report $report)
     {
-        $this->authorize('update', $report);
-
-        $request->validate([
-            'report_date' => 'required|date',
-            'project_code' => 'required|string',
-            'location' => 'required|string',
-            'start_time' => 'required',
-            'end_time' => 'required',
-            'work_day_type' => 'required|in:Hari Kerja,Hari Libur',
-            'work_details' => 'required|array|min:1',
-            'work_details.*.description' => 'required|string',
-            'work_details.*.status' => 'required|in:Selesai,Dalam Proses,Tertunda,Bermasalah',
-        ]);
-
-        // Hitung ulang overtime berdasarkan data terbaru
-        $is_overtime = $this->isOvertime(
-            $request->start_time,
-            $request->end_time,
-            $request->boolean('is_overnight'),
-            $request->work_day_type,
-            $request->report_date
-        );
-
-        // Update report dengan data baru termasuk is_overtime
-        $report->update([
-            'report_date' => $request->report_date,
-            'project_code' => $request->project_code,
-            'location' => $request->location,
-            'start_time' => $request->start_time,
-            'end_time' => $request->end_time,
-            'is_overnight' => $request->boolean('is_overnight'),
-            'is_shift' => $request->boolean('is_shift'),
-            'is_overtime' => $is_overtime,  // Set nilai overtime yang baru
-            'work_day_type' => $request->work_day_type,
-            'updated_by' => auth()->id()
-        ]);
-
-        // Update work details
-        $report->details()->delete();
-        foreach ($request->work_details as $detail) {
-            $report->details()->create([
-                'description' => $detail['description'],
-                'status' => $detail['status'],
-            ]);
-        }
+        // Update report using service, teruskan user ID secara eksplisit
+        $report = $this->reportService->updateReport($report, $request->validated(), auth()->id());
 
         return redirect()->route('reports.show', $report)
-            ->with('success', 'Laporan berhasil diupdate.');
+            ->with('success', 'Laporan berhasil diperbarui.');
     }
 
     public function destroy(Report $report)
@@ -401,6 +258,110 @@ class ReportController extends Controller
                 'trace' => $e->getTraceAsString()
             ]);
             return redirect()->back()->with('error', 'Gagal mengexport file: ' . $e->getMessage());
+        }
+    }
+
+    public function getVicePresidents(Request $request)
+    {
+        $request->validate([
+            'verifikator_id' => 'required|exists:users,id'
+        ]);
+        
+        $verifikator = User::findOrFail($request->verifikator_id);
+        $vps = User::role('Vice President')
+            ->where('department_id', $verifikator->department_id)
+            ->where('is_active', true)
+            ->get();
+            
+        return response()->json($vps);
+    }
+
+    public function submit(Report $report)
+    {
+        // Validasi apakah ini laporan user yang sedang login
+        if ($report->user_id !== auth()->id() && !auth()->user()->isAdmin()) {
+            abort(403, 'Unauthorized action.');
+        }
+        
+        // Use service to handle report submission
+        if (!$report->is_overtime) {
+            // Handle non-overtime report, teruskan user ID secara eksplisit
+            $updated = $this->reportService->handleNonOvertimeReport($report, auth()->id());
+            if ($updated) {
+                return redirect()->route('reports.show', $report)
+                    ->with('info', 'Laporan telah diubah menjadi "Laporan tanpa Lembur" dan tidak perlu dikirim ke Verifikator.');
+            }
+        } else {
+            // Cek apakah user adalah verifikator dan memilih dirinya sendiri sebagai verifikator
+            $user = auth()->user();
+            if ($user->hasRole('Verifikator') && $report->verifikator_id == $user->id) {
+                // Auto-verifikasi laporan dan kirim langsung ke VP
+                $autoVerified = $this->reportService->submitVerifikatorOwnReport($report, auth()->id());
+                if ($autoVerified) {
+                    return redirect()->route('reports.show', $report)
+                        ->with('success', 'Laporan berhasil diverifikasi otomatis dan dikirim ke Vice President.');
+                }
+            } else {
+                // Handle regular report submission
+                $submitted = $this->reportService->submitReport($report);
+                if ($submitted) {
+                    return redirect()->route('reports.show', $report)
+                        ->with('success', 'Laporan berhasil dikirim ke Verifikator.');
+                } else {
+                    return redirect()->route('reports.show', $report)
+                        ->with('info', 'Laporan tidak dapat disubmit. Pastikan status masih Draft.');
+                }
+            }
+        }
+        
+        // Default error response
+        return redirect()->route('reports.show', $report)
+            ->with('error', 'Terjadi kesalahan saat memproses laporan.');
+    }
+
+    /**
+     * Resubmit a rejected report back to verification
+     */
+    public function resubmit(Report $report)
+    {
+        // Validate user has permission to update this report
+        $this->authorize('update', $report);
+        
+        // Use service to handle resubmission with explicit user ID
+        $resubmitted = $this->reportService->resubmitReport($report, 'verifier', auth()->id());
+        
+        if ($resubmitted) {
+            // Trigger event
+            event(new ReportUpdated($report));
+            
+            return redirect()->route('reports.show', $report)
+                ->with('success', 'Laporan berhasil dikirim ulang ke Verifikator.');
+        } else {
+            return redirect()->route('reports.show', $report)
+                ->with('error', 'Laporan tidak dapat dikirim ulang. Pastikan status laporan ditolak dan diizinkan untuk direvisi.');
+        }
+    }
+
+    /**
+     * Resubmit a rejected report back to verification from VP
+     */
+    public function resubmitVp(Report $report)
+    {
+        // Validate user has permission to update this report
+        $this->authorize('update', $report);
+        
+        // Use service to handle resubmission with explicit user ID
+        $resubmitted = $this->reportService->resubmitReport($report, 'vp', auth()->id());
+        
+        if ($resubmitted) {
+            // Trigger event
+            event(new ReportUpdated($report));
+            
+            return redirect()->route('reports.show', $report)
+                ->with('success', 'Laporan berhasil dikirim ulang ke Verifikator.');
+        } else {
+            return redirect()->route('reports.show', $report)
+                ->with('error', 'Laporan tidak dapat dikirim ulang. Pastikan status laporan ditolak oleh VP dan diizinkan untuk direvisi.');
         }
     }
 } 

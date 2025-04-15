@@ -13,7 +13,6 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->date('report_date');
             $table->string('project_code');
-            $table->foreign('project_code')->references('code')->on('projects')->onDelete('cascade');
             $table->string('location');
             $table->time('start_time');
             $table->time('end_time');
@@ -21,6 +20,27 @@ return new class extends Migration
             $table->boolean('is_overtime')->default(false);
             $table->boolean('is_shift')->default(false);
             $table->enum('work_day_type', ['Hari Kerja', 'Hari Libur']);
+            $table->enum('status', [
+                'Draft',
+                'Laporan tanpa Lembur',
+                'Menunggu Verifikasi',
+                'Ditolak Verifikator',
+                'Menunggu Approval VP',
+                'Ditolak VP',
+                'Menunggu Review HR',
+                'Ditolak HR',
+                'Selesai'
+            ])->default('Draft');
+            $table->foreignId('verifikator_id')->nullable()->constrained('users')->onDelete('set null');
+            $table->foreignId('vp_id')->nullable()->constrained('users')->onDelete('set null');
+            $table->boolean('can_revise')->default(false);
+            $table->text('rejection_notes')->nullable();
+            $table->timestamp('submitted_at')->nullable();
+            $table->timestamp('verified_at')->nullable();
+            $table->timestamp('approved_at')->nullable();
+            $table->timestamp('reviewed_at')->nullable();
+            $table->timestamp('completed_at')->nullable();
+            $table->foreignId('reviewed_by')->nullable()->constrained('users')->onDelete('set null');
             $table->foreignId('updated_by')->nullable()->constrained('users')->onDelete('set null');
             $table->timestamps();
         });

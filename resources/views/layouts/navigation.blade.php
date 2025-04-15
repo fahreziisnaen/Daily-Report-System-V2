@@ -11,30 +11,107 @@
                 </div>
 
                 <!-- Navigation Links -->
-                <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
+                <div class="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex items-center">
+                    <div class="relative" x-data="{ open: false }">
+                        @if(auth()->user()->hasRole('Vice President'))
+                            <x-nav-link :href="route('dashboard', ['view' => 'vice-president'])" :active="request()->routeIs('dashboard')">
+                                {{ __('Dashboard') }}
+                            </x-nav-link>
+                        @elseif(auth()->user()->hasRole('Super Admin') || 
+                            auth()->user()->hasRole('Human Resource') || 
+                            auth()->user()->hasRole('Verifikator') || 
+                            auth()->user()->hasRole('Admin Divisi'))
+                            <x-nav-link 
+                                @click="open = !open" 
+                                @click.away="open = false"
+                                href="javascript:void(0)" 
+                                :active="request()->routeIs('dashboard')" 
+                                class="relative cursor-pointer">
+                                {{ __('Dashboard') }}
+                                <svg class="ml-1 -mr-0.5 h-4 w-4 inline" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                </svg>
+                                <div 
+                                    x-show="open"
+                                    x-transition:enter="transition ease-out duration-200"
+                                    x-transition:enter-start="transform opacity-0 scale-95"
+                                    x-transition:enter-end="transform opacity-100 scale-100"
+                                    x-transition:leave="transition ease-in duration-75"
+                                    x-transition:leave-start="transform opacity-100 scale-100"
+                                    x-transition:leave-end="transform opacity-0 scale-95"
+                                    class="absolute left-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg py-1 z-50">
+                                    <a href="{{ route('dashboard', ['view' => 'personal']) }}" 
+                                       class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 {{ request()->get('view') === 'personal' ? 'bg-gray-100 dark:bg-gray-700' : '' }}">
+                                        {{ __('Personal Dashboard') }}
+                                    </a>
+                                    @if(auth()->user()->hasRole('Human Resource'))
+                                        <a href="{{ route('dashboard', ['view' => 'hr']) }}" 
+                                           class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 {{ request()->get('view') === 'hr' ? 'bg-gray-100 dark:bg-gray-700' : '' }}">
+                                            {{ __('HR Dashboard') }}
+                                        </a>
+                                    @endif
+                                    @if(auth()->user()->hasRole('Verifikator'))
+                                        <a href="{{ route('dashboard', ['view' => 'verifikator']) }}" 
+                                           class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 {{ request()->get('view') === 'verifikator' ? 'bg-gray-100 dark:bg-gray-700' : '' }}">
+                                            {{ __('Verifikator Dashboard') }}
+                                        </a>
+                                    @endif
+                                    @if(auth()->user()->hasRole('Admin Divisi'))
+                                        <a href="{{ route('dashboard', ['view' => 'admin']) }}" 
+                                           class="block px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 {{ request()->get('view') === 'admin' ? 'bg-gray-100 dark:bg-gray-700' : '' }}">
+                                            {{ __('Admin Dashboard') }}
+                                        </a>
+                                    @endif
+                                </div>
+                            </x-nav-link>
+                        @else
                     <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                         {{ __('Dashboard') }}
                     </x-nav-link>
+                        @endif
+                    </div>
 
                     <x-nav-link :href="route('reports.index')" :active="request()->routeIs('reports.*')">
                         {{ __('Reports') }}
                     </x-nav-link>
 
-                    @role(['Super Admin', 'Admin Divisi', 'Vice President', 'Verifikator'])
+                    @role('Verifikator')
+                    <x-nav-link :href="route('verification.index')" :active="request()->routeIs('verification.*')">
+                        {{ __('Verifikasi') }}
+                    </x-nav-link>
+                    @endrole
+
+                    @role('Vice President')
+                    <x-nav-link :href="route('approval.index')" :active="request()->routeIs('approval.*')">
+                        {{ __('Approval') }}
+                    </x-nav-link>
+                    @endrole
+
+                    @role('Human Resource')
+                    <x-nav-link :href="route('hr-review.index')" :active="request()->routeIs('hr-review.*')">
+                        {{ __('HR Review') }}
+                    </x-nav-link>
+                    @endrole
+
+                    @role(['Super Admin', 'Admin Divisi', 'Vice President'])
                     <x-nav-link :href="route('admin.users.index')" :active="request()->routeIs('admin.users.*')">
                         {{ __('User Management') }}
                     </x-nav-link>
                     @endrole
 
-                    @role(['Super Admin', 'Admin Divisi', 'Vice President', 'Verifikator'])
+                    @if(Auth::user()->hasRole(['Super Admin', 'Admin Divisi', 'Vice President']))
                     <x-nav-link :href="route('admin.rekap.index')" :active="request()->routeIs('admin.rekap.*')">
+                        {{ __('Rekap') }}
+                    </x-nav-link>
+                    @elseif(Auth::user()->hasRole('Human Resource'))
+                    <x-nav-link :href="route('hr.rekap')" :active="request()->routeIs('hr.rekap')">
                         {{ __('Rekap') }}
                     </x-nav-link>
                     @else
                     <x-nav-link :href="route('rekap.index')" :active="request()->routeIs('rekap.index')">
                         {{ __('Rekap') }}
                     </x-nav-link>
-                    @endrole
+                    @endif
                 </div>
             </div>
 
@@ -117,25 +194,83 @@
     <!-- Responsive Navigation Menu -->
     <div :class="{'block': open, 'hidden': ! open}" class="hidden sm:hidden">
         <div class="pt-2 pb-3 space-y-1">
+            @if(auth()->user()->hasRole('Vice President'))
+                <x-responsive-nav-link :href="route('dashboard', ['view' => 'vice-president'])" :active="request()->routeIs('dashboard')">
+                    {{ __('Dashboard') }}
+                </x-responsive-nav-link>
+            @elseif(auth()->user()->hasRole('Super Admin') || 
+                auth()->user()->hasRole('Human Resource') || 
+                auth()->user()->hasRole('Verifikator') || 
+                auth()->user()->hasRole('Admin Divisi'))
+                <div x-data="{ subMenuOpen: false }">
+                    <x-responsive-nav-link 
+                        @click="subMenuOpen = !subMenuOpen" 
+                        :active="request()->routeIs('dashboard')" 
+                        class="relative flex justify-between cursor-pointer">
+                        <span>{{ __('Dashboard') }}</span>
+                        <svg class="ml-1 h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                    </x-responsive-nav-link>
+
+                    <div 
+                        x-show="subMenuOpen" 
+                        x-transition:enter="transition ease-out duration-200"
+                        x-transition:enter-start="transform opacity-0 scale-95"
+                        x-transition:enter-end="transform opacity-100 scale-100"
+                        x-transition:leave="transition ease-in duration-75"
+                        x-transition:leave-start="transform opacity-100 scale-100"
+                        x-transition:leave-end="transform opacity-0 scale-95"
+                        class="pl-4">
+                        <a href="{{ route('dashboard', ['view' => 'personal']) }}" 
+                           class="block pl-3 pr-4 py-2 border-l-4 border-transparent text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-gray-300 dark:hover:border-gray-600 {{ request()->get('view') === 'personal' ? 'border-indigo-400 dark:border-indigo-600' : '' }}">
+                            {{ __('Personal Dashboard') }}
+                        </a>
+                        @if(auth()->user()->hasRole('Human Resource'))
+                            <a href="{{ route('dashboard', ['view' => 'hr']) }}" 
+                               class="block pl-3 pr-4 py-2 border-l-4 border-transparent text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-gray-300 dark:hover:border-gray-600 {{ request()->get('view') === 'hr' ? 'border-indigo-400 dark:border-indigo-600' : '' }}">
+                                {{ __('HR Dashboard') }}
+                            </a>
+                        @endif
+                        @if(auth()->user()->hasRole('Verifikator'))
+                            <a href="{{ route('dashboard', ['view' => 'verifikator']) }}" 
+                               class="block pl-3 pr-4 py-2 border-l-4 border-transparent text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-gray-300 dark:hover:border-gray-600 {{ request()->get('view') === 'verifikator' ? 'border-indigo-400 dark:border-indigo-600' : '' }}">
+                                {{ __('Verifikator Dashboard') }}
+                            </a>
+                        @endif
+                        @if(auth()->user()->hasRole('Admin Divisi'))
+                            <a href="{{ route('dashboard', ['view' => 'admin']) }}" 
+                               class="block pl-3 pr-4 py-2 border-l-4 border-transparent text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-gray-300 dark:hover:border-gray-600 {{ request()->get('view') === 'admin' ? 'border-indigo-400 dark:border-indigo-600' : '' }}">
+                                {{ __('Admin Dashboard') }}
+                            </a>
+                        @endif
+                    </div>
+                </div>
+            @else
             <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                 {{ __('Dashboard') }}
             </x-responsive-nav-link>
+            @endif
             
             <x-responsive-nav-link :href="route('reports.index')" :active="request()->routeIs('reports.*')">
                 {{ __('Reports') }}
             </x-responsive-nav-link>
 
-            @role(['Super Admin', 'Admin Divisi', 'Vice President', 'Verifikator'])
-            <x-responsive-nav-link :href="route('admin.users.index')" :active="request()->routeIs('admin.users.*')">
-                {{ __('User Management') }}
+            @role('Verifikator')
+            <x-responsive-nav-link :href="route('verification.index')" :active="request()->routeIs('verification.*')">
+                {{ __('Verifikasi') }}
             </x-responsive-nav-link>
+            @endrole
 
-            <x-responsive-nav-link :href="route('admin.rekap.index')" :active="request()->routeIs('admin.rekap.*')">
-                {{ __('Rekap') }}
+            @role('Vice President')
+            <x-responsive-nav-link :href="route('approval.index')" :active="request()->routeIs('approval.*')">
+                {{ __('Approval') }}
             </x-responsive-nav-link>
-            @else
-            <x-responsive-nav-link :href="route('rekap.index')" :active="request()->routeIs('rekap.index')">
-                {{ __('Rekap') }}
+            @endrole
+
+            @role('Human Resource')
+            <x-responsive-nav-link :href="route('hr-review.index')" :active="request()->routeIs('hr-review.*')">
+                {{ __('HR Review') }}
             </x-responsive-nav-link>
             @endrole
         </div>
