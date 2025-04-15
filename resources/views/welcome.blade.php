@@ -33,7 +33,7 @@
                         Daily Report Application
                     </h1>
                     <p class="text-xl text-gray-600 mb-8">
-                        Hi Project Engineering Team, selamat datang di platform laporan pekerjaan kita! 🚀
+                        Selamat datang di platform laporan pekerjaan Internet Pratama Indonesia! 🚀
                     </p>
 
                     <!-- Motivational Message -->
@@ -62,10 +62,10 @@
                                     
                                     <div class="space-y-4 text-lg">
                                         <p class="text-indigo-100">
-                                            Setiap laporan yang kita buat adalah langkah menuju kesempurnaan project.
+                                            Setiap laporan yang kita buat adalah langkah menuju kesempurnaan kerja tim.
                                             <span class="block mt-2 font-semibold text-yellow-300">
-                                                "Dokumentasi Rapi, Project Terkawal, Hasil Optimal!"
-                            </span>
+                                                "Dokumentasi Rapi, Pekerjaan Terkawal, Hasil Optimal!"
+                                            </span>
                                         </p>
                                         
                                         <div class="flex justify-center space-x-2 text-xl">
@@ -92,9 +92,9 @@
                                     <!-- Animated Tags -->
                                     <div class="flex flex-wrap justify-center gap-2 mt-6 text-sm">
                                         <span class="px-3 py-1 bg-white/20 rounded-full">#TeamWork</span>
-                                        <span class="px-3 py-1 bg-white/20 rounded-full">#Engineering</span>
+                                        <span class="px-3 py-1 bg-white/20 rounded-full">#DigitalExcellence</span>
                                         <span class="px-3 py-1 bg-white/20 rounded-full">#Innovation</span>
-                                        <span class="px-3 py-1 bg-white/20 rounded-full">#Excellence</span>
+                                        <span class="px-3 py-1 bg-white/20 rounded-full">#ConnectedFuture</span>
                                     </div>
                                 </div>
                             </div>
