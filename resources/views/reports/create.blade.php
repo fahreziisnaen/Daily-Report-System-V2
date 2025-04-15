@@ -180,6 +180,40 @@
                             </div>
                         </div>
 
+                        <!-- Verifikator & VP Selection -->
+                        <div class="bg-gray-50 rounded-lg p-4 mt-4">
+                            <h3 class="text-lg font-medium text-gray-900 mb-4">Approver</h3>
+                            
+                            <!-- Verifikator -->
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Verifikator</label>
+                                <select name="verifikator_id" id="verifikator_id" 
+                                    class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base"
+                                    required onchange="loadVicePresidents()">
+                                    <option value="">Pilih Verifikator</option>
+                                    @foreach($verifikators as $verifikator)
+                                        <option value="{{ $verifikator->id }}">{{ $verifikator->name }}</option>
+                                    @endforeach
+                                </select>
+                                @error('verifikator_id')
+                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
+                            </div>
+                            
+                            <!-- Vice President (Disabled) -->
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Vice President</label>
+                                <select name="vp_id" id="vp_id" 
+                                    class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-base bg-gray-100"
+                                    required disabled>
+                                    <option value="">Vice President akan dipilih otomatis</option>
+                                </select>
+                                @error('vp_id')
+                                    <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                @enderror
+                            </div>
+                        </div>
+
                         <!-- Work Details Section -->
                         <div class="bg-gray-50 rounded-lg p-4">
                             <div class="flex justify-between items-center mb-4">
@@ -292,19 +326,55 @@
                 addWorkDetail();
             }
 
-            // Fetch active projects
+            // Initialize projects dropdown
             fetch('/api/active-projects')
                 .then(response => response.json())
-                .then(projects => {
-                    const projectSelect = document.querySelector('[name="project_code"]');
-                    projects.forEach(project => {
+                .then(data => {
+                    const select = document.querySelector('select[name="project_code"]');
+                    data.forEach(project => {
                         const option = document.createElement('option');
                         option.value = project.code;
                         option.textContent = project.code;
-                        projectSelect.appendChild(option);
+                        select.appendChild(option);
                     });
                 });
         });
+        
+        function loadVicePresidents() {
+            const verifikatorId = document.getElementById('verifikator_id').value;
+            const vpSelect = document.getElementById('vp_id');
+            
+            // Reset VP dropdown
+            vpSelect.innerHTML = '<option value="">Vice President akan dipilih otomatis</option>';
+            
+            if (!verifikatorId) {
+                return;
+            }
+            
+            // Fetch Vice Presidents based on selected Verifikator's department
+            fetch(`/vice-presidents?verifikator_id=${verifikatorId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.length > 0) {
+                        // Create and select the first VP option
+                        const vp = data[0];
+                        const option = document.createElement('option');
+                        option.value = vp.id;
+                        option.textContent = vp.name;
+                        option.selected = true;
+                        
+                        // Clear and add the option
+                        vpSelect.innerHTML = '';
+                        vpSelect.appendChild(option);
+                    } else {
+                        vpSelect.innerHTML = '<option value="">Tidak ada VP tersedia</option>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching Vice Presidents:', error);
+                    vpSelect.innerHTML = '<option value="">Error loading data</option>';
+                });
+        }
     </script>
     @endpush
 </x-app-layout> 

@@ -2,9 +2,10 @@
 
 @php
 $alignmentClasses = match ($align) {
-    'left' => 'ltr:origin-top-left rtl:origin-top-right start-0',
+    'left' => 'origin-top-left start-0',
     'top' => 'origin-top',
-    default => 'ltr:origin-top-right rtl:origin-top-left end-0',
+    'right' => 'origin-top-right end-0',
+    default => 'origin-top-right end-0',
 };
 
 $width = match ($width) {

@@ -11,10 +11,12 @@
                     {{ __('MANAGE PROJECT') }}
                 </a>
                 @endrole
+                @unless(auth()->user()->isVicePresident())
                 <a href="{{ route('reports.create') }}" 
                     class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700">
                     {{ __('BUAT LAPORAN') }}
                 </a>
+                @endunless
             </div>
         </div>
     </x-slot>
@@ -24,57 +26,6 @@
             <!-- Search/Filter Section -->
             <div class="mb-4">
                 <form method="GET" action="{{ route('reports.index') }}" class="flex flex-col sm:flex-row items-end gap-4">
-                    @if(auth()->user()->isAdmin())
-                    <div class="flex-1">
-                        <x-input-label for="employee_search" :value="__('Nama Karyawan')" class="mb-1" />
-                        <div class="relative" x-data="{ 
-                            search: '{{ request('employee_search') }}',
-                            items: {{ $employees }},
-                            filteredItems: [],
-                            showDropdown: false,
-                            init() {
-                                this.filteredItems = this.items;
-                                this.$watch('search', (value) => {
-                                    if (value.length > 0) {
-                                        this.filteredItems = this.items.filter(item => 
-                                            item.toLowerCase().includes(value.toLowerCase())
-                                        );
-                                        this.showDropdown = true;
-                                    } else {
-                                        this.showDropdown = false;
-                                    }
-                                });
-                            }
-                        }">
-                            <input type="text" 
-                                id="employee_search"
-                                name="employee_search"
-                                x-model="search"
-                                @focus="showDropdown = search.length > 0"
-                                @click.away="showDropdown = false"
-                                placeholder="Cari berdasarkan nama karyawan..." 
-                                class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 h-[38px]">
-                            
-                            <!-- Dropdown -->
-                            <div x-show="showDropdown" 
-                                x-transition
-                                class="absolute z-10 w-full mt-1 bg-white rounded-md shadow-lg border border-gray-200 max-h-60 overflow-auto">
-                                <template x-for="item in filteredItems" :key="item">
-                                    <div @click="search = item; showDropdown = false"
-                                        x-text="item"
-                                        class="px-4 py-2 hover:bg-gray-100 cursor-pointer text-sm"
-                                        :class="{'bg-gray-50': search === item}">
-                                    </div>
-                                </template>
-                                <div x-show="filteredItems.length === 0" 
-                                    class="px-4 py-2 text-sm text-gray-500">
-                                    Tidak ada hasil yang cocok
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    @endif
-
                     <!-- Filter tanggal -->
                     <div class="flex-1">
                         <label class="block text-sm font-medium text-gray-700 mb-1">Tanggal</label>
@@ -133,12 +84,13 @@
                         </div>
                     </div>
 
-                    <!-- Filter Lokasi -->
+                    @if(auth()->user()->isAdmin())
+                    <!-- Filter Nama Pekerja (hanya untuk admin) -->
                     <div class="flex-1">
-                        <x-input-label for="location" :value="__('Lokasi')" class="mb-1" />
+                        <x-input-label for="employee_search" :value="__('Nama Pekerja')" class="mb-1" />
                         <div class="relative" x-data="{ 
-                            search: '{{ request('location') }}',
-                            items: {{ $locations }},
+                            search: '{{ request('employee_search') }}',
+                            items: {{ $employees }},
                             filteredItems: [],
                             showDropdown: false,
                             init() {
@@ -156,12 +108,12 @@
                             }
                         }">
                             <input type="text" 
-                                id="location"
-                                name="location"
+                                id="employee_search"
+                                name="employee_search"
                                 x-model="search"
                                 @focus="showDropdown = search.length > 0"
                                 @click.away="showDropdown = false"
-                                placeholder="Cari berdasarkan lokasi..."
+                                placeholder="Cari Nama Pekerja..." 
                                 class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 h-[38px]">
                             
                             <!-- Dropdown -->
@@ -182,6 +134,7 @@
                             </div>
                         </div>
                     </div>
+                    @endif
 
                     <!-- Filter Project -->
                     <div class="flex-1">
@@ -211,7 +164,7 @@
                                 x-model="search"
                                 @focus="showDropdown = search.length > 0"
                                 @click.away="showDropdown = false"
-                                placeholder="Cari berdasarkan kode project..."
+                                placeholder="Cari Project..."
                                 class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 h-[38px]">
                             
                             <!-- Dropdown -->
@@ -233,12 +186,87 @@
                         </div>
                     </div>
 
+                    <!-- Filter Lokasi -->
+                    <div class="flex-1">
+                        <x-input-label for="location" :value="__('Lokasi')" class="mb-1" />
+                        <div class="relative" x-data="{ 
+                            search: '{{ request('location') }}',
+                            items: {{ $locations }},
+                            filteredItems: [],
+                            showDropdown: false,
+                            init() {
+                                this.filteredItems = this.items;
+                                this.$watch('search', (value) => {
+                                    if (value.length > 0) {
+                                        this.filteredItems = this.items.filter(item => 
+                                            item.toLowerCase().includes(value.toLowerCase())
+                                        );
+                                        this.showDropdown = true;
+                                    } else {
+                                        this.showDropdown = false;
+                                    }
+                                });
+                            }
+                        }">
+                            <input type="text" 
+                                id="location"
+                                name="location"
+                                x-model="search"
+                                @focus="showDropdown = search.length > 0"
+                                @click.away="showDropdown = false"
+                                placeholder="Cari Lokasi..."
+                                class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 h-[38px]">
+                            
+                            <!-- Dropdown -->
+                            <div x-show="showDropdown" 
+                                x-transition
+                                class="absolute z-10 w-full mt-1 bg-white rounded-md shadow-lg border border-gray-200 max-h-60 overflow-auto">
+                                <template x-for="item in filteredItems" :key="item">
+                                    <div @click="search = item; showDropdown = false"
+                                        x-text="item"
+                                        class="px-4 py-2 hover:bg-gray-100 cursor-pointer text-sm"
+                                        :class="{'bg-gray-50': search === item}">
+                                    </div>
+                                </template>
+                                <div x-show="filteredItems.length === 0" 
+                                    class="px-4 py-2 text-sm text-gray-500">
+                                    Tidak ada hasil yang cocok
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Filter Status -->
+                    <div class="flex-1">
+                        <x-input-label for="status" :value="__('Status')" class="mb-1" />
+                        <select id="status" name="status" class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 h-[38px]">
+                            <option value="">Semua Status</option>
+                            @if(auth()->user()->hasRole('Human Resource'))
+                                <!-- Opsi status untuk HR -->
+                                <option value="{{ App\Models\Report::STATUS_PENDING_HR }}" {{ request('status') === App\Models\Report::STATUS_PENDING_HR ? 'selected' : '' }}>{{ App\Models\Report::STATUS_PENDING_HR }}</option>
+                                <option value="{{ App\Models\Report::STATUS_COMPLETED }}" {{ request('status') === App\Models\Report::STATUS_COMPLETED ? 'selected' : '' }}>{{ App\Models\Report::STATUS_COMPLETED }}</option>
+                                <option value="{{ App\Models\Report::STATUS_REJECTED_BY_HR }}" {{ request('status') === App\Models\Report::STATUS_REJECTED_BY_HR ? 'selected' : '' }}>{{ App\Models\Report::STATUS_REJECTED_BY_HR }}</option>
+                            @else
+                                <!-- Opsi status untuk user lain -->
+                                <option value="{{ App\Models\Report::STATUS_DRAFT }}" {{ request('status') === App\Models\Report::STATUS_DRAFT ? 'selected' : '' }}>{{ App\Models\Report::STATUS_DRAFT }}</option>
+                                <option value="{{ App\Models\Report::STATUS_PENDING_VERIFICATION }}" {{ request('status') === App\Models\Report::STATUS_PENDING_VERIFICATION ? 'selected' : '' }}>{{ App\Models\Report::STATUS_PENDING_VERIFICATION }}</option>
+                                <option value="{{ App\Models\Report::STATUS_PENDING_APPROVAL }}" {{ request('status') === App\Models\Report::STATUS_PENDING_APPROVAL ? 'selected' : '' }}>{{ App\Models\Report::STATUS_PENDING_APPROVAL }}</option>
+                                <option value="{{ App\Models\Report::STATUS_PENDING_HR }}" {{ request('status') === App\Models\Report::STATUS_PENDING_HR ? 'selected' : '' }}>{{ App\Models\Report::STATUS_PENDING_HR }}</option>
+                                <option value="{{ App\Models\Report::STATUS_REJECTED_BY_VERIFIER }}" {{ request('status') === App\Models\Report::STATUS_REJECTED_BY_VERIFIER ? 'selected' : '' }}>{{ App\Models\Report::STATUS_REJECTED_BY_VERIFIER }}</option>
+                                <option value="{{ App\Models\Report::STATUS_REJECTED_BY_VP }}" {{ request('status') === App\Models\Report::STATUS_REJECTED_BY_VP ? 'selected' : '' }}>{{ App\Models\Report::STATUS_REJECTED_BY_VP }}</option>
+                                <option value="{{ App\Models\Report::STATUS_REJECTED_BY_HR }}" {{ request('status') === App\Models\Report::STATUS_REJECTED_BY_HR ? 'selected' : '' }}>{{ App\Models\Report::STATUS_REJECTED_BY_HR }}</option>
+                                <option value="{{ App\Models\Report::STATUS_COMPLETED }}" {{ request('status') === App\Models\Report::STATUS_COMPLETED ? 'selected' : '' }}>{{ App\Models\Report::STATUS_COMPLETED }}</option>
+                                <option value="{{ App\Models\Report::STATUS_NON_OVERTIME }}" {{ request('status') === App\Models\Report::STATUS_NON_OVERTIME ? 'selected' : '' }}>{{ App\Models\Report::STATUS_NON_OVERTIME }}</option>
+                            @endif
+                        </select>
+                    </div>
+
                     <div class="flex gap-2 items-stretch h-[38px]">
                         <button type="submit" 
                             class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors duration-200 flex items-center justify-center min-w-[80px]">
                             <span>Cari</span>
                         </button>
-                        @if(request()->hasAny(['employee_search', 'report_date', 'location', 'project_code']))
+                        @if(request()->hasAny(['employee_search', 'report_date', 'location', 'project_code', 'status']))
                             <a href="{{ route('reports.index') }}" 
                                 class="px-4 py-2 bg-red-50 text-red-600 rounded-md hover:bg-red-100 transition-colors duration-200 flex items-center justify-center min-w-[80px] border border-red-200">
                                 <span>Reset</span>
@@ -256,12 +284,13 @@
                         <table class="min-w-full divide-y divide-gray-200">
                             <thead class="bg-gray-50">
                                 <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tanggal</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Hari, Tanggal</th>
                                     @if(auth()->user()->isAdmin())
                                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Pekerja</th>
                                     @endif
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Project</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Lokasi</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Waktu</th>
                                     <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Aksi</th>
                                 </tr>
@@ -270,7 +299,7 @@
                                 @foreach($reports as $report)
                                     <tr x-data="{ showDeleteModal: false }">
                                         <td class="px-6 py-4 whitespace-nowrap">
-                                            <div class="text-sm text-gray-900">{{ $report->report_date->format('d/m/Y') }}</div>
+                                            <div class="text-sm text-gray-900">{{ $report->report_date->translatedFormat('l, d/m/Y') }}</div>
                                             <div class="text-xs text-gray-500">
                                                 @if($report->created_at == $report->updated_at)
                                                     {{ $report->created_at->diffForHumans() }}
@@ -285,8 +314,75 @@
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ $report->project_code }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ $report->location }}</td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm">
+                                            <div class="flex flex-col gap-1">
+                                                <!-- Verification Status -->
+                                                <div class="flex items-center gap-1">
+                                                    @if($report->status === App\Models\Report::STATUS_REJECTED_BY_VERIFIER)
+                                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+                                                            Verifikasi: ✕
+                                                        </span>
+                                                        @if($report->verified_at)
+                                                            <span class="text-xs text-gray-500">
+                                                                {{ \Carbon\Carbon::parse($report->verified_at)->format('d/m/Y H:i') }}
+                                                            </span>
+                                                        @endif
+                                                    @elseif($report->verified_at)
+                                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                                                            Verifikasi: ✓
+                                                        </span>
+                                                        <span class="text-xs text-gray-500">
+                                                            {{ \Carbon\Carbon::parse($report->verified_at)->format('d/m/Y H:i') }}
+                                                        </span>
+                                                    @else
+                                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                                                            Verifikasi: Pending
+                                                        </span>
+                                                    @endif
+                                                </div>
+                                                <!-- Approval Status -->
+                                                <div class="flex items-center gap-1">
+                                                    @if($report->status === App\Models\Report::STATUS_REJECTED_BY_VP)
+                                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+                                                            Approval: ✕
+                                                        </span>
+                                                        @if($report->approved_at)
+                                                            <span class="text-xs text-gray-500">
+                                                                {{ \Carbon\Carbon::parse($report->approved_at)->format('d/m/Y H:i') }}
+                                                            </span>
+                                                        @endif
+                                                    @elseif($report->approved_at)
+                                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                                                            Approval: ✓
+                                                        </span>
+                                                        <span class="text-xs text-gray-500">
+                                                            {{ \Carbon\Carbon::parse($report->approved_at)->format('d/m/Y H:i') }}
+                                                        </span>
+                                                    @else
+                                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                                                            Approval: Pending
+                                                        </span>
+                                                    @endif
+                                                </div>
+                                                <!-- Final Status -->
+                                                <div class="flex items-center gap-1">
+                                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium 
+                                                        @if($report->status === App\Models\Report::STATUS_COMPLETED) bg-green-100 text-green-800
+                                                        @elseif($report->status === App\Models\Report::STATUS_NON_OVERTIME) bg-blue-100 text-blue-800
+                                                        @elseif($report->status === App\Models\Report::STATUS_REJECTED_BY_VERIFIER || 
+                                                                $report->status === App\Models\Report::STATUS_REJECTED_BY_VP || 
+                                                                $report->status === App\Models\Report::STATUS_REJECTED_BY_HR || 
+                                                                $report->status === App\Models\Report::STATUS_REJECTED) bg-red-100 text-red-800
+                                                        @elseif($report->status === App\Models\Report::STATUS_DRAFT) bg-gray-100 text-gray-800
+                                                        @else bg-yellow-100 text-yellow-800
+                                                        @endif">
+                                                        Status: {{ $report->status }}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm">
                                             <div class="text-sm text-gray-900">
-                                                {{ substr($report->start_time, 0, 5) }} - {{ substr($report->end_time, 0, 5) }}
+                                                {{ \Carbon\Carbon::parse($report->start_time)->format('H:i') }} - {{ \Carbon\Carbon::parse($report->end_time)->format('H:i') }}
                                             </div>
                                             <div class="flex flex-wrap gap-1 mt-1">
                                                 @if($report->is_overtime)
@@ -394,7 +490,7 @@
                             <!-- Header -->
                             <div class="flex justify-between items-start">
                                 <div>
-                                    <div class="text-sm font-medium text-gray-900">{{ $report->report_date->format('d/m/Y') }}</div>
+                                    <div class="text-sm font-medium text-gray-900">{{ $report->report_date->translatedFormat('l, d/m/Y') }}</div>
                                     <div class="text-xs text-gray-500">
                                         @if($report->created_at == $report->updated_at)
                                             {{ $report->created_at->diffForHumans() }}
@@ -420,11 +516,60 @@
                                 </div>
                             </div>
 
+                            <!-- Status Info -->
+                            <div class="text-sm">
+                                <div class="flex flex-wrap gap-2 mt-2">
+                                    <!-- Verification Status -->
+                                    @if($report->status === App\Models\Report::STATUS_REJECTED_BY_VERIFIER)
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+                                            Verifikasi: ✕
+                                        </span>
+                                    @elseif($report->verified_at)
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                                            Verifikasi: ✓
+                                        </span>
+                                    @else
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                                            Verifikasi: Pending
+                                        </span>
+                                    @endif
+                                    
+                                    <!-- Approval Status -->
+                                    @if($report->status === App\Models\Report::STATUS_REJECTED_BY_VP)
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+                                            Approval: ✕
+                                        </span>
+                                    @elseif($report->approved_at)
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                                            Approval: ✓
+                                        </span>
+                                    @else
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                                            Approval: Pending
+                                        </span>
+                                    @endif
+
+                                    <!-- Final Status -->
+                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium 
+                                        @if($report->status === App\Models\Report::STATUS_COMPLETED) bg-green-100 text-green-800
+                                        @elseif($report->status === App\Models\Report::STATUS_NON_OVERTIME) bg-blue-100 text-blue-800
+                                        @elseif($report->status === App\Models\Report::STATUS_REJECTED_BY_VERIFIER || 
+                                                $report->status === App\Models\Report::STATUS_REJECTED_BY_VP || 
+                                                $report->status === App\Models\Report::STATUS_REJECTED_BY_HR || 
+                                                $report->status === App\Models\Report::STATUS_REJECTED) bg-red-100 text-red-800
+                                        @elseif($report->status === App\Models\Report::STATUS_DRAFT) bg-gray-100 text-gray-800
+                                        @else bg-yellow-100 text-yellow-800
+                                        @endif">
+                                        Status: {{ $report->status }}
+                                    </span>
+                                </div>
+                            </div>
+
                             <!-- Additional Info -->
                             <div class="text-sm">
                                 <div class="text-gray-500">Waktu</div>
                                 <div class="font-medium flex items-center gap-2">
-                                    <span>{{ substr($report->start_time, 0, 5) }} - {{ substr($report->end_time, 0, 5) }}</span>
+                                    <span>{{ \Carbon\Carbon::parse($report->start_time)->format('H:i') }} - {{ \Carbon\Carbon::parse($report->end_time)->format('H:i') }}</span>
                                     @if($report->is_overtime)
                                         <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
                                             Overtime

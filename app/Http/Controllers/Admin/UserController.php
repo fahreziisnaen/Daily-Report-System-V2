@@ -3,7 +3,10 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\StoreUserRequest;
+use App\Http\Requests\UpdateUserRequest;
 use App\Models\User;
+use App\Services\UserService;
 use Illuminate\Http\Request;
 use Spatie\Permission\Models\Role;
 use Illuminate\Support\Facades\Hash;
@@ -12,40 +15,17 @@ use App\Models\Department;
 
 class UserController extends Controller
 {
+    protected $userService;
+
+    public function __construct(UserService $userService)
+    {
+        $this->userService = $userService;
+    }
+
     public function index(Request $request)
     {
-        $query = User::with(['roles', 'department'])->latest();
         $authUser = auth()->user();
-
-        // Filter by department for Admin Divisi and Vice President
-        if ($authUser->hasRole(['Admin Divisi', 'Vice President'])) {
-            $departmentId = $authUser->department_id;
-            $query->where('department_id', $departmentId);
-        }
-
-        // Search functionality
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%")
-                  ->orWhere('homebase', 'like', "%{$search}%");
-            });
-        }
-
-        // Role filter
-        if ($request->filled('role')) {
-            $query->whereHas('roles', function($q) use ($request) {
-                $q->where('name', $request->role);
-            });
-        }
-        
-        // Department filter (only for Super Admin, as others are already filtered by department)
-        if ($request->filled('department') && $authUser->hasRole('Super Admin')) {
-            $query->where('department_id', $request->department);
-        }
-
-        $users = $query->paginate(10)->withQueryString();
+        $users = $this->userService->getFilteredUsers($request, $authUser);
         $roles = Role::all();
         $departments = Department::all();
 
@@ -56,76 +36,28 @@ class UserController extends Controller
     {
         $authUser = auth()->user();
         
-        // Only Super Admin and Vice President can update roles
-        if ($authUser->hasRole('Admin Divisi')) {
-            return redirect()->route('admin.users.index')
-                ->with('error', 'Only Super Admin or Vice President can update user roles.');
-        }
-        
-        // Vice President can only update users from their department
-        if ($authUser->hasRole('Vice President') && $user->department_id !== $authUser->department_id) {
-            return redirect()->route('admin.users.index')
-                ->with('error', 'You can only update users from your department.');
-        }
-        
-        // Vice President cannot assign Super Admin or Vice President roles
-        if ($authUser->hasRole('Vice President') && 
-            ($request->role === 'Super Admin' || $request->role === 'Vice President')) {
-            return redirect()->route('admin.users.index')
-                ->with('error', 'You cannot assign Super Admin or Vice President roles.');
-        }
-
-        $validated = $request->validate([
+        $request->validate([
             'role' => 'required|exists:roles,name'
         ]);
 
-        $user->syncRoles([$validated['role']]);
+        // Check if user has permission to modify role
+        if (!$this->userService->canModifyRole($authUser, $user, $request->role)) {
+            return redirect()->route('admin.users.index')
+                ->with('error', 'You do not have permission to assign this role.');
+        }
+
+        $user->syncRoles([$request->role]);
 
         return redirect()->back()->with('success', 'User role updated successfully');
     }
 
-    public function store(Request $request)
+    public function store(StoreUserRequest $request)
     {
         try {
-            $rules = [
-                'name' => ['required', 'string', 'max:255'],
-                'email' => [
-                    'required', 
-                    'string', 
-                    'email', 
-                    'max:255',
-                    'unique:users,email'
-                ],
-                'homebase' => ['required', 'string', 'max:255'],
-                'position' => ['required', 'string', 'max:255'],
-                'department_id' => ['required', 'exists:departments,id'],
-                'password' => ['required', 'string', 'min:8', 'confirmed'],
-                'role' => ['required', 'exists:roles,name'],
-            ];
-            
-            // Additional validation messages
-            $messages = [
-                'email.unique' => 'Email sudah digunakan oleh user lain.',
-                'email.required' => 'Email harus diisi.',
-                'email.email' => 'Format email tidak valid.',
-                'name.required' => 'Nama harus diisi.',
-                'homebase.required' => 'Homebase harus diisi.',
-                'position.required' => 'Jabatan harus diisi.',
-                'department_id.required' => 'Department harus diisi.',
-                'department_id.exists' => 'Department tidak valid.',
-                'password.required' => 'Password harus diisi.',
-                'password.min' => 'Password minimal 8 karakter.',
-            ];
-
-            $request->validate($rules, $messages);
-            
             $authUser = auth()->user();
-            $departmentId = $request->department_id;
             
             // Admin Divisi and Vice President can only create users in their department
             if ($authUser->hasRole(['Admin Divisi', 'Vice President'])) {
-                $departmentId = $authUser->department_id;
-                
                 // Admin Divisi cannot create Super Admin, Vice President, or Admin Divisi users
                 if ($authUser->hasRole('Admin Divisi') && 
                     in_array($request->role, ['Super Admin', 'Vice President', 'Admin Divisi'])) {
@@ -145,23 +77,14 @@ class UserController extends Controller
                 }
             }
 
-            $user = User::create([
-                'name' => $request->name,
-                'email' => $request->email,
-                'homebase' => $request->homebase,
-                'position' => $request->position,
-                'department_id' => $departmentId,
-                'password' => Hash::make($request->password),
-            ]);
-
-            $user->assignRole($request->role);
+            $this->userService->createUser($request->validated(), $authUser);
 
             return redirect()->route('admin.users.index')
                 ->with('success', 'User berhasil ditambahkan');
             
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (\Exception $e) {
             return back()
-                ->withErrors($e->validator)
+                ->withErrors(['error' => $e->getMessage()])
                 ->withInput()
                 ->with('show-add-user-modal', true);
         }
@@ -171,250 +94,81 @@ class UserController extends Controller
     {
         $authUser = auth()->user();
         
-        // Check permissions for Admin Divisi and Vice President
-        if ($authUser->hasRole(['Admin Divisi', 'Vice President'])) {
-            // Cannot delete Super Admin users
+        // Check if admin can delete this user using policy
+        if (!$authUser->can('delete', $user)) {
+            $message = 'You do not have permission to delete this user.';
+            
             if ($user->hasRole('Super Admin')) {
-                return redirect()->route('admin.users.index')
-                    ->with('error', 'You cannot delete Super Admin users.');
+                $message = 'You cannot delete Super Admin users.';
+            } else if ($user->hasRole('Vice President') && $authUser->hasRole(['Admin Divisi'])) {
+                $message = 'You cannot delete Vice President users.';
+            } else if ($user->department_id !== $authUser->department_id) {
+                $message = 'You can only delete users from your department.';
             }
             
-            // Vice President cannot delete other Vice President users
-            if ($authUser->hasRole('Vice President') && $user->hasRole('Vice President')) {
-                return redirect()->route('admin.users.index')
-                    ->with('error', 'You cannot delete other Vice President users.');
-            }
-            
-            // Admin Divisi cannot delete Vice President users
-            if ($authUser->hasRole('Admin Divisi') && $user->hasRole('Vice President')) {
-                return redirect()->route('admin.users.index')
-                    ->with('error', 'You cannot delete Vice President users.');
-            }
-            
-            // Can only delete users from their department
-            if ($user->department_id !== $authUser->department_id) {
-                return redirect()->route('admin.users.index')
-                    ->with('error', 'You can only delete users from your department.');
-            }
+            return redirect()->route('admin.users.index')->with('error', $message);
         }
 
-        // Prevent deleting self
-        if ($user->id === $authUser->id) {
-            return redirect()->back()->with('error', 'You cannot remove your own account.');
+        // Delete avatar and signature files if they exist
+        if ($user->avatar_path) {
+            \Storage::disk('public')->delete($user->avatar_path);
+        }
+        
+        if ($user->signature_path) {
+            \Storage::disk('public')->delete($user->signature_path);
         }
 
         $user->delete();
+        
         return redirect()->route('admin.users.index')
-            ->with('success', 'User has been removed successfully.');
+            ->with('success', 'User deleted successfully');
     }
 
     public function resetPassword(User $user)
     {
-        $authUser = auth()->user();
+        $this->authorize('update', $user);
         
-        // Check permissions for Admin Divisi and Vice President
-        if ($authUser->hasRole(['Admin Divisi', 'Vice President'])) {
-            // Cannot reset password for Super Admin users
-            if ($user->hasRole('Super Admin')) {
-                return redirect()->route('admin.users.index')
-                    ->with('error', 'You cannot reset password for Super Admin users.');
-            }
-            
-            // Vice President cannot reset password for other Vice President users
-            if ($authUser->hasRole('Vice President') && $user->hasRole('Vice President') && $user->id !== $authUser->id) {
-                return redirect()->route('admin.users.index')
-                    ->with('error', 'You cannot reset password for other Vice President users.');
-            }
-            
-            // Admin Divisi cannot reset password for Vice President users
-            if ($authUser->hasRole('Admin Divisi') && $user->hasRole('Vice President')) {
-                return redirect()->route('admin.users.index')
-                    ->with('error', 'You cannot reset password for Vice President users.');
-            }
-            
-            // Can only reset password for users from their department
-            if ($user->department_id !== $authUser->department_id) {
-                return redirect()->route('admin.users.index')
-                    ->with('error', 'You can only reset passwords for users from your department.');
-            }
-        }
-
-        $validated = request()->validate([
-            'new_password' => 'required|string|min:8|confirmed',
-        ]);
-
-        // Reset password to new password
-        $user->update([
-            'password' => Hash::make($validated['new_password'])
-        ]);
-
-        return redirect()->route('admin.users.index')
-            ->with('success', 'Password has been reset successfully');
+        $password = $this->userService->resetPassword($user);
+        
+        return redirect()->back()
+            ->with('success', "Password has been reset to: $password");
     }
 
     public function edit(User $user)
     {
-        $authUser = auth()->user();
+        $this->authorize('update', $user);
         
-        // Check permissions for Admin Divisi and Vice President
-        if ($authUser->hasRole(['Admin Divisi', 'Vice President'])) {
-            // Cannot edit Super Admin users
-            if ($user->hasRole('Super Admin')) {
-                return redirect()->route('admin.users.index')
-                    ->with('error', 'You cannot edit Super Admin users.');
-            }
-            
-            // Vice President cannot edit other Vice President users
-            if ($authUser->hasRole('Vice President') && $user->hasRole('Vice President') && $user->id !== $authUser->id) {
-                return redirect()->route('admin.users.index')
-                    ->with('error', 'You cannot edit other Vice President users.');
-            }
-            
-            // Admin Divisi cannot edit Vice President users
-            if ($authUser->hasRole('Admin Divisi') && $user->hasRole('Vice President')) {
-                return redirect()->route('admin.users.index')
-                    ->with('error', 'You cannot edit Vice President users.');
-            }
-            
-            // Can only edit users from their department
-            if ($user->department_id !== $authUser->department_id) {
-                return redirect()->route('admin.users.index')
-                    ->with('error', 'You can only edit users from your department.');
-            }
-        }
-
         $departments = Department::all();
-        return view('profile.edit', [
-            'user' => $user,
-            'canUpdateRole' => $authUser->hasRole(['Super Admin', 'Vice President']),
-            'departments' => $departments
-        ]);
+        return view('admin.users.edit', compact('user', 'departments'));
     }
 
-    public function update(Request $request, User $user)
+    public function update(UpdateUserRequest $request, User $user)
     {
-        $authUser = auth()->user();
+        $this->authorize('update', $user);
         
-        // Check permissions for Admin Divisi and Vice President
-        if ($authUser->hasRole(['Admin Divisi', 'Vice President'])) {
-            // Cannot update Super Admin users
-            if ($user->hasRole('Super Admin')) {
-                return redirect()->route('admin.users.index')
-                    ->with('error', 'You cannot update Super Admin users.');
-            }
-            
-            // Vice President cannot update other Vice President users
-            if ($authUser->hasRole('Vice President') && $user->hasRole('Vice President') && $user->id !== $authUser->id) {
-                return redirect()->route('admin.users.index')
-                    ->with('error', 'You cannot update other Vice President users.');
-            }
-            
-            // Admin Divisi cannot update Vice President users
-            if ($authUser->hasRole('Admin Divisi') && $user->hasRole('Vice President')) {
-                return redirect()->route('admin.users.index')
-                    ->with('error', 'You cannot update Vice President users.');
-            }
-            
-            // Can only update users from their department
-            if ($user->department_id !== $authUser->department_id) {
-                return redirect()->route('admin.users.index')
-                    ->with('error', 'You can only update users from your department.');
-            }
-        }
-
-        $rules = [
-            'name' => ['required', 'string', 'max:255'],
-            'homebase' => ['required', 'string', 'max:255'],
-            'avatar' => ['nullable', 'image', 'max:1024'],
-            'signature' => ['nullable', 'image', 'max:1024'],
-        ];
-
-        // Admin, VP dapat mengubah position dan department
-        if ($authUser->hasRole(['Super Admin', 'Admin Divisi', 'Vice President'])) {
-            $rules['position'] = ['required', 'string', 'max:255'];
-            
-            // Super Admin can change department
-            if ($authUser->hasRole('Super Admin')) {
-                $rules['department_id'] = ['required', 'exists:departments,id'];
-            } 
-            // VP and Admin Divisi can't change department (must stay in their own department)
-            else {
-                $request->merge(['department_id' => $authUser->department_id]);
-            }
-        }
-
-        $request->validate($rules);
-
-        if ($request->hasFile('avatar')) {
-            if ($user->avatar_path) {
-                Storage::disk('public')->delete($user->avatar_path);
-            }
-            $user->avatar_path = $request->file('avatar')->store('avatars', 'public');
-        }
-
-        if ($request->hasFile('signature')) {
-            if ($user->signature_path) {
-                Storage::disk('public')->delete($user->signature_path);
-            }
-            $user->signature_path = $request->file('signature')->store('signatures', 'public');
-        }
-
-        $user->update([
-            'name' => $request->name,
-            'homebase' => $request->homebase,
-        ]);
-
-        // Update position and department if admin or VP
-        if ($authUser->hasRole(['Super Admin', 'Admin Divisi', 'Vice President'])) {
-            $user->position = $request->position;
-            
-            // Only Super Admin can change department
-            if ($authUser->hasRole('Super Admin')) {
-                $user->department_id = $request->department_id;
-            }
-            
-            $user->save();
-        }
+        $authUser = auth()->user();
+        $this->userService->updateUser($user, $request->validated(), $authUser);
 
         return redirect()->route('admin.users.index')
             ->with('success', 'User profile updated successfully');
     }
 
-    public function toggleActive(User $user)
+    public function toggleActive(Request $request, User $user)
     {
-        $authUser = auth()->user();
+        $this->authorize('toggleActive', $user);
         
-        // Check permissions for Admin Divisi and Vice President
-        if ($authUser->hasRole(['Admin Divisi', 'Vice President'])) {
-            // Cannot toggle active status for Super Admin users
-            if ($user->hasRole('Super Admin')) {
-                return redirect()->route('admin.users.index')
-                    ->with('error', 'You cannot change status for Super Admin users.');
-            }
-            
-            // Vice President cannot toggle other Vice President users
-            if ($authUser->hasRole('Vice President') && $user->hasRole('Vice President') && $user->id !== $authUser->id) {
-                return redirect()->route('admin.users.index')
-                    ->with('error', 'You cannot change status for other Vice President users.');
-            }
-            
-            // Admin Divisi cannot toggle Vice President users
-            if ($authUser->hasRole('Admin Divisi') && $user->hasRole('Vice President')) {
-                return redirect()->route('admin.users.index')
-                    ->with('error', 'You cannot change status for Vice President users.');
-            }
-            
-            // Can only toggle users from their department
-            if ($user->department_id !== $authUser->department_id) {
-                return redirect()->route('admin.users.index')
-                    ->with('error', 'You can only change status for users from your department.');
-            }
+        $reason = null;
+        if (!$user->is_active) {
+            $reason = null; // User is being activated
+        } else {
+            $request->validate(['inactive_reason' => 'required|string|max:255']);
+            $reason = $request->inactive_reason;
         }
-
-        $user->is_active = !$user->is_active;
-        $user->save();
+        
+        $this->userService->toggleActiveStatus($user, $reason);
         
         $status = $user->is_active ? 'activated' : 'deactivated';
-        return back()->with('success', "User has been {$status} successfully.");
+        return redirect()->route('admin.users.index')
+            ->with('success', "User {$user->name} has been {$status}.");
     }
 } 

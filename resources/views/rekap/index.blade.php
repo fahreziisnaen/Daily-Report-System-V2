@@ -1,7 +1,7 @@
 <x-app-layout>
     <x-slot name="header">
         <h2 class="font-semibold text-xl text-gray-800 dark:text-white leading-tight">
-            {{ __('Rekap') }}
+            {{ __('Rekap Laporan') }}
         </h2>
     </x-slot>
 
@@ -10,7 +10,7 @@
             <!-- Filter Section -->
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg mb-6">
                 <div class="p-4 sm:p-6">
-                    <form method="GET" action="{{ route('admin.rekap.index') }}" class="flex flex-col sm:flex-row gap-4">
+                    <form method="GET" action="{{ Auth::user()->hasRole(['Super Admin', 'Admin Divisi', 'Vice President']) ? route('admin.rekap.index') : route('rekap.index') }}" class="flex flex-col sm:flex-row gap-4">
                         <div class="flex-1">
                             <x-input-label for="month" :value="__('Bulan')" />
                             <select name="month" id="month" class="mt-1 block w-full rounded-md border-gray-300" onchange="this.form.submit()">
@@ -39,11 +39,17 @@
             <div class="hidden md:block">
                 <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                     <div class="p-4 sm:p-6">
+                        <div class="mb-4 text-sm text-gray-500 italic">
+                            * Rekap menampilkan data semua laporan dalam periode yang dipilih
+                        </div>
                         <table class="min-w-full divide-y divide-gray-200">
                             <thead class="bg-gray-50">
                                 <tr>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         Nama
+                                    </th>
+                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Departemen
                                     </th>
                                     <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         Total Jam Kerja
@@ -62,12 +68,24 @@
                             <tbody class="bg-white divide-y divide-gray-200">
                                 @foreach($users as $user)
                                     <tr class="hover:bg-gray-50">
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm">{{ $user['name'] }}</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm">{{ \App\Helpers\TimeHelper::formatHoursToHoursMinutes($user['total_work_hours']) }}</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm">{{ \App\Helpers\TimeHelper::formatHoursToHoursMinutes($user['total_overtime_hours']) }}</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm">{{ $user['report_count'] }}</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm">
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                            {{ $user['name'] }}
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            {{ \App\Models\Department::find($user['department_id'])->name ?? '-' }}
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            {{ \App\Helpers\TimeHelper::formatHoursToHoursMinutes($user['total_work_hours']) }}
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            {{ \App\Helpers\TimeHelper::formatHoursToHoursMinutes($user['total_overtime_hours']) }}
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            {{ $user['report_count'] }}
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-right">
                                             @if($user['report_count'] > 0)
+                                                @if(Auth::user()->hasRole(['Super Admin', 'Admin Divisi', 'Vice President']))
                                                 <a href="{{ route('admin.rekap.export', ['user' => $user['id'], 'month' => $month, 'year' => $year]) }}" 
                                                     class="inline-flex items-center px-3 py-1.5 bg-green-50 text-green-600 rounded-md hover:bg-green-100">
                                                     <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -76,6 +94,25 @@
                                                     </svg>
                                                     Export Excel
                                                 </a>
+                                                @elseif(Auth::user()->hasRole('Verifikator'))
+                                                <a href="{{ route('rekap.export', ['user' => $user['id'], 'month' => $month, 'year' => $year]) }}" 
+                                                    class="inline-flex items-center px-3 py-1.5 bg-green-50 text-green-600 rounded-md hover:bg-green-100">
+                                                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                                                    </svg>
+                                                    Export Excel
+                                                </a>
+                                                @else
+                                                <a href="{{ route('rekap.export', ['month' => $month, 'year' => $year]) }}" 
+                                                    class="inline-flex items-center px-3 py-1.5 bg-green-50 text-green-600 rounded-md hover:bg-green-100">
+                                                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                                                    </svg>
+                                                    Export Excel
+                                                </a>
+                                                @endif
                                             @else
                                                 <span class="text-gray-400 text-xs">Tidak ada laporan</span>
                                             @endif
@@ -111,6 +148,7 @@
                         </div>
                         <div class="mt-4 flex justify-end">
                             @if($user['report_count'] > 0)
+                                @if(Auth::user()->hasRole(['Super Admin', 'Admin Divisi', 'Vice President']))
                                 <a href="{{ route('admin.rekap.export', ['user' => $user['id'], 'month' => $month, 'year' => $year]) }}" 
                                     class="inline-flex items-center px-3 py-1.5 bg-green-50 text-green-600 rounded-md hover:bg-green-100">
                                     <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -119,6 +157,25 @@
                                     </svg>
                                     Export Excel
                                 </a>
+                                @elseif(Auth::user()->hasRole('Verifikator'))
+                                <a href="{{ route('rekap.export', ['user' => $user['id'], 'month' => $month, 'year' => $year]) }}" 
+                                    class="inline-flex items-center px-3 py-1.5 bg-green-50 text-green-600 rounded-md hover:bg-green-100">
+                                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                                    </svg>
+                                    Export Excel
+                                </a>
+                                @else
+                                <a href="{{ route('rekap.export', ['month' => $month, 'year' => $year]) }}" 
+                                    class="inline-flex items-center px-3 py-1.5 bg-green-50 text-green-600 rounded-md hover:bg-green-100">
+                                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                                    </svg>
+                                    Export Excel
+                                </a>
+                                @endif
                             @else
                                 <span class="text-gray-400 text-xs">Tidak ada laporan</span>
                             @endif
